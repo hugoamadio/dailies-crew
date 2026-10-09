@@ -83,9 +83,10 @@ export function limitsFromCatalog(catalog: PieceCatalog): PieceLimits {
  *   frames, where lead = max(LEAD_FRAMES, round(incomingTransitionFrames / 2)). The body is raised
  *   to the piece's minSeconds if shorter. If it is longer than the piece's maxSeconds, that is an issue.
  * - A silent scene's body is round(seconds × 30).
- * - A transition out of scene i lasts round(seconds × 30) frames (cut = no transition). Scene i's
- *   durationInFrames is body + out, and scene i + 1 starts at from_i + body_i. The transition
- *   therefore covers only scene i's tail and the next scene's lead, never speech.
+ * - A transition out of scene i lasts round(seconds × 30) frames (cut = no transition).
+ * - Scene i lasts body + its transition out, and scene i + 1 starts at from_i + body_i: the
+ *   transition covers scene i's tail (its speech has already ended) and the start of scene i + 1,
+ *   whose voice begins halfway through that transition (a J-cut that keeps the pacing tight).
  * - The voice of a line plays from from + lead, and its caption words get absolute times on the
  *   video timeline.
  * - A scene whose body is shorter than the transition coming into it is an issue. So is a total
