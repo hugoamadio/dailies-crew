@@ -1,5 +1,9 @@
 import { describe, it } from 'vitest';
-import { expectPieceSnapshot } from './visual';
+import { DEMO_BRAND } from '../src/demo';
+import { expectMarginsEmpty, expectPieceSnapshot } from './visual';
+
+const SOLID = { kind: 'solid' } as const;
+const NO_LIGHT = { sweep: false, vignette: 0 } as const;
 
 describe('kinetic title and the layers', () => {
   it('settled on the default gradient', () => expectPieceSnapshot('kinetic-title', 'kinetic-title', { frame: 45 }));
@@ -28,4 +32,25 @@ describe('kinetic title and the layers', () => {
     }));
   it('light sweep and a strong vignette', () =>
     expectPieceSnapshot('light-sweep', 'kinetic-title', { frame: 45, light: { sweep: true, vignette: 0.9 } }));
+  it('strong push-in keeps the title inside the content area at its peak', async () => {
+    const file = await expectPieceSnapshot('camera-push-in-strong-peak', 'kinetic-title', {
+      frame: 89,
+      background: SOLID,
+      light: NO_LIGHT,
+      camera: { move: 'push-in', intensity: 'strong' },
+    });
+    await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
+  });
+  it.each([
+    ['start', 0],
+    ['end', 89],
+  ] as const)('strong pan keeps the title inside the content area at the %s', async (end, frame) => {
+    const file = await expectPieceSnapshot(`camera-pan-left-strong-${end}`, 'kinetic-title', {
+      frame,
+      background: SOLID,
+      light: NO_LIGHT,
+      camera: { move: 'pan-left', intensity: 'strong' },
+    });
+    await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
+  });
 });

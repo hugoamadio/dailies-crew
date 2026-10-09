@@ -3,8 +3,29 @@ import { CameraMotionBlur } from '@remotion/motion-blur';
 import { noise2D } from '@remotion/noise';
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { CLAMP, EASE_IN_OUT, EASE_OUT } from '../theme/motion';
+import { CONTENT_AREA, CONTENT_HEIGHT, CONTENT_WIDTH } from '../theme/safe-area';
 
 const AMOUNT = { subtle: 0.5, medium: 1, strong: 1.8 } as const;
+
+/** Center of the content area: every move scales around it */
+const ORIGIN = `${CONTENT_AREA.left + CONTENT_WIDTH / 2}px ${CONTENT_AREA.top + CONTENT_HEIGHT / 2}px`;
+
+/** How much bigger than the content area the piece gets at the peak of the move */
+function headroom(camera: CameraSpec): number {
+  const a = AMOUNT[camera.intensity];
+  switch (camera.move) {
+    case 'push-in':
+    case 'pull-out':
+      return 1 + 0.12 * a;
+    case 'pan-left':
+    case 'pan-right':
+      return 1 + 0.08 * a + (2 * 40 * a) / CONTENT_WIDTH;
+    case 'handheld':
+      return 1.04 + 0.04 * a;
+    default:
+      return 1;
+  }
+}
 
 /** Moves the piece like a camera would; the background stays put, which reads as depth */
 export const Camera: React.FC<{ camera: CameraSpec; children: React.ReactNode }> = ({ camera, children }) => {
@@ -42,8 +63,14 @@ export const Camera: React.FC<{ camera: CameraSpec; children: React.ReactNode }>
       break;
   }
 
+  // Pieces are sized to fill the content area, so the piece starts 1/headroom smaller and the move
+  // grows it back: at the peak it fills the content area exactly instead of leaving it
   const content = (
-    <AbsoluteFill style={{ transform, filter, transformOrigin: '50% 45%' }}>{children}</AbsoluteFill>
+    <AbsoluteFill style={{ transform, filter, transformOrigin: ORIGIN }}>
+      <AbsoluteFill style={{ transform: `scale(${1 / headroom(camera)})`, transformOrigin: ORIGIN }}>
+        {children}
+      </AbsoluteFill>
+    </AbsoluteFill>
   );
   // Motion blur only where the move is fast enough to need it: it renders the frame 6 times
   const blurred = camera.intensity === 'strong' && camera.move !== 'static' && camera.move !== 'rack-focus';

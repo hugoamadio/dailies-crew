@@ -44,8 +44,14 @@ export async function renderComposition(
   return output;
 }
 
+/** A missing reference is created locally (look at it before committing) but fails when CI is set. */
 export async function expectSnapshot(name: string, actualFile: string): Promise<void> {
   const reference = path.join(SNAPSHOTS, `${name}.png`);
+  if (!existsSync(reference) && process.env.CI && process.env.UPDATE_SNAPSHOTS !== '1') {
+    throw new Error(
+      `Missing reference test/__snapshots__/${name}.png: run npm run test:visual locally and commit the new reference`,
+    );
+  }
   if (process.env.UPDATE_SNAPSHOTS === '1' || !existsSync(reference)) {
     await fs.mkdir(SNAPSHOTS, { recursive: true });
     await fs.copyFile(actualFile, reference);
