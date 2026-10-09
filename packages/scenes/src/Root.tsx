@@ -1,6 +1,7 @@
 import { FORMAT } from '@dailies-crew/plan';
 import { Composition } from 'remotion';
-import { DEMO_BRAND } from './demo';
+import { DailiesVideo, type DailiesVideoProps } from './DailiesVideo';
+import { DEMO_BRAND, demoResolvedPlan } from './demo';
 import { PiecePreview, type PiecePreviewProps } from './PiecePreview';
 import { kineticTitleSpec } from './pieces/kinetic-title/spec';
 
@@ -14,8 +15,20 @@ const previewDefaults: PiecePreviewProps = {
   seconds: 3,
 };
 
+const videoDefaults: DailiesVideoProps = { plan: demoResolvedPlan() };
+
 export const RemotionRoot: React.FC = () => (
   <>
+    <Composition
+      id="DailiesVideo"
+      component={DailiesVideo}
+      width={FORMAT.width}
+      height={FORMAT.height}
+      fps={FORMAT.fps}
+      durationInFrames={videoDefaults.plan.durationInFrames}
+      defaultProps={videoDefaults}
+      calculateMetadata={({ props }) => ({ durationInFrames: props.plan.durationInFrames })}
+    />
     <Composition
       id="PiecePreview"
       component={PiecePreview}
@@ -24,7 +37,9 @@ export const RemotionRoot: React.FC = () => (
       fps={FORMAT.fps}
       durationInFrames={90}
       defaultProps={previewDefaults}
-      calculateMetadata={({ props }) => ({ durationInFrames: Math.round(props.seconds * FORMAT.fps) })}
+      calculateMetadata={({ props }) => ({
+        durationInFrames: Math.round(props.seconds * FORMAT.fps),
+      })}
     />
   </>
 );

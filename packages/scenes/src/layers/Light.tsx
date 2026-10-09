@@ -1,10 +1,12 @@
 import type { LightSpec } from '@dailies-crew/plan';
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { useSceneDuration } from '../theme/scene-duration';
 
 /** A band of light crossing the frame once, and darker corners that pull the eye to the center */
 export const Light: React.FC<{ light: LightSpec }> = ({ light }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames, width } = useVideoConfig();
+  const { width } = useVideoConfig();
+  const durationInFrames = useSceneDuration();
   const sweepX = interpolate(frame, [0, durationInFrames], [-1.1 * width, 1.1 * width]);
   return (
     <>

@@ -2,13 +2,14 @@ import type { BackgroundSpec } from '@dailies-crew/plan';
 import { noise2D } from '@remotion/noise';
 import { AbsoluteFill, interpolate, random, useCurrentFrame, useVideoConfig } from 'remotion';
 import { useBrand } from '../theme/brand';
+import { useSceneDuration } from '../theme/scene-duration';
 
 const PARTICLES = { low: 24, medium: 48, high: 90 } as const;
 
 export const Background: React.FC<{ background: BackgroundSpec }> = ({ background }) => {
   const { colors } = useBrand();
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const durationInFrames = useSceneDuration();
   switch (background.kind) {
     case 'solid':
       return <AbsoluteFill style={{ backgroundColor: colors.background }} />;
@@ -39,8 +40,12 @@ const Particles: React.FC<{ count: number }> = ({ count }) => {
       {Array.from({ length: count }, (_, index) => {
         const size = 4 + random(`particle-size-${index}`) * 14;
         const speed = 20 + random(`particle-speed-${index}`) * 60;
-        const x = random(`particle-x-${index}`) * width + noise2D(`particle-wobble-${index}`, frame / 90, index) * 30;
-        const y = height - ((random(`particle-y-${index}`) * height + (frame / fps) * speed) % (height + 40));
+        const x =
+          random(`particle-x-${index}`) * width +
+          noise2D(`particle-wobble-${index}`, frame / 90, index) * 30;
+        const y =
+          height -
+          ((random(`particle-y-${index}`) * height + (frame / fps) * speed) % (height + 40));
         return (
           <div
             key={index}
@@ -69,7 +74,13 @@ const Grain: React.FC = () => {
     <AbsoluteFill style={{ backgroundColor: colors.background }}>
       <svg width="100%" height="100%" style={{ position: 'absolute', opacity: 0.09 }}>
         <filter id={`grain-${seed}`}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves={2} seed={seed} stitchTiles="stitch" />
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.85"
+            numOctaves={2}
+            seed={seed}
+            stitchTiles="stitch"
+          />
         </filter>
         <rect width="100%" height="100%" filter={`url(#grain-${seed})`} />
       </svg>
