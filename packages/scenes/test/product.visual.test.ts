@@ -30,6 +30,14 @@ describe('product pieces', () => {
     });
     await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
   });
+  it('price counting down from a much longer old price stays inside the content area', async () => {
+    const file = await expectPieceSnapshot('product-price-wide-old', 'product-price', {
+      frame: 8,
+      params: { image: 'products/lamp.svg', price: 8990, oldPrice: 1299000, label: 'Só hoje' },
+      ...quiet,
+    });
+    await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
+  });
   it('loupe on the detail', async () => {
     const file = await expectPieceSnapshot('product-loupe', 'product-loupe', {
       frame: 70,

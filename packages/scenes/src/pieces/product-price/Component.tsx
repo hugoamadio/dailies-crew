@@ -19,19 +19,24 @@ export const ProductPrice: React.FC<{ params: ProductPriceParams }> = ({ params 
     [params.locale, params.currency],
   );
   const finalText = format.format(params.price / 100);
+  const startText = format.format((params.oldPrice ?? 0) / 100);
+  // The counter shows every value between start and final, so size for the wider of the two ends
   const priceSize = useMemo(
     () =>
       Math.min(
         MAX_PRICE_SIZE,
-        fitText({
-          text: finalText,
-          withinWidth: CONTENT_WIDTH,
-          fontFamily: brand.headingFamily,
-          fontWeight: brand.headingWeight,
-          fontVariantNumeric: 'tabular-nums',
-        }).fontSize,
+        ...[startText, finalText].map(
+          (text) =>
+            fitText({
+              text,
+              withinWidth: CONTENT_WIDTH,
+              fontFamily: brand.headingFamily,
+              fontWeight: brand.headingWeight,
+              fontVariantNumeric: 'tabular-nums',
+            }).fontSize,
+        ),
       ),
-    [finalText, brand.headingFamily, brand.headingWeight],
+    [startText, finalText, brand.headingFamily, brand.headingWeight],
   );
   const counted = interpolate(frame, [6, 36], [params.oldPrice ?? 0, params.price], {
     ...CLAMP,
