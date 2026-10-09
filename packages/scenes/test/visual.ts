@@ -10,7 +10,7 @@ import { expect } from 'vitest';
 import { DEMO_BRAND } from '../src/demo';
 import type { PiecePreviewProps } from '../src/PiecePreview';
 import { pieceCatalog } from '../src/specs';
-import { CONTENT_AREA, SAFE_AREA } from '../src/theme/safe-area';
+import { CONTENT_AREA, FRAME_WIDTH, SAFE_AREA } from '../src/theme/safe-area';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ENTRY = path.join(here, '../src/index.ts');
@@ -22,6 +22,8 @@ const DIFF = path.join(here, '__diff__');
 const BUNDLE = path.join(here, '__bundle__');
 /** Share of the pixels that may change (font anti-aliasing) before a frame counts as different */
 const MAX_DIFF_RATIO = 0.005;
+/** References are rendered at half size (540×960) to keep the repository light */
+const SNAPSHOT_SCALE = 0.5;
 
 let serveUrl: Promise<string> | undefined;
 function getServeUrl(): Promise<string> {
@@ -43,7 +45,15 @@ export async function renderComposition(
   const composition = await selectComposition({ serveUrl: url, id, inputProps });
   await fs.mkdir(ACTUAL, { recursive: true });
   const output = path.join(ACTUAL, `${name}.png`);
-  await renderStill({ composition, serveUrl: url, output, frame, inputProps, imageFormat: 'png' });
+  await renderStill({
+    composition,
+    serveUrl: url,
+    output,
+    frame,
+    inputProps,
+    imageFormat: 'png',
+    scale: SNAPSHOT_SCALE,
+  });
   return output;
 }
 
@@ -103,9 +113,13 @@ export async function expectPieceSnapshot(
   return file;
 }
 
-type Region = (x: number, y: number, width: number, height: number) => boolean;
+/**
+ * Whether a pixel of the image belongs to the region checked. scale = image width / FRAME_WIDTH:
+ * the margins, given in frame pixels (1080×1920), are multiplied by it.
+ */
+type Region = (x: number, y: number, width: number, height: number, scale: number) => boolean;
 
-/** Fails when more than 0.1% of the sampled pixels of the region differ from the background color */
+/** Fails when more than 0.1% of the pixels of the region differ from the background color */
 async function expectRegionEmpty(
   file: string,
   backgroundHex: string,
@@ -116,11 +130,12 @@ async function expectRegionEmpty(
   const background = [1, 3, 5].map((offset) =>
     Number.parseInt(backgroundHex.slice(offset, offset + 2), 16),
   );
+  const scale = png.width / FRAME_WIDTH;
   let drawn = 0;
   let checked = 0;
-  for (let y = 0; y < png.height; y += 2) {
-    for (let x = 0; x < png.width; x += 2) {
-      if (!inRegion(x, y, png.width, png.height)) continue;
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      if (!inRegion(x, y, png.width, png.height, scale)) continue;
       checked += 1;
       const index = (y * png.width + x) * 4;
       const differs = [0, 1, 2].some(
@@ -140,12 +155,12 @@ export async function expectMarginsEmpty(file: string, backgroundHex: string): P
   await expectRegionEmpty(
     file,
     backgroundHex,
-    (x, y, width, height) =>
+    (x, y, width, height, scale) =>
       !(
-        x >= CONTENT_AREA.left &&
-        x < width - CONTENT_AREA.right &&
-        y >= CONTENT_AREA.top &&
-        y < height - CONTENT_AREA.bottom
+        x >= CONTENT_AREA.left * scale &&
+        x < width - CONTENT_AREA.right * scale &&
+        y >= CONTENT_AREA.top * scale &&
+        y < height - CONTENT_AREA.bottom * scale
       ),
     'draws outside the content area',
   );
@@ -156,7 +171,8 @@ export async function expectSideMarginsEmpty(file: string, backgroundHex: string
   await expectRegionEmpty(
     file,
     backgroundHex,
-    (x, _y, width) => x < SAFE_AREA.left || x >= width - SAFE_AREA.right,
+    (x, _y, width, _height, scale) =>
+      x < SAFE_AREA.left * scale || x >= width - SAFE_AREA.right * scale,
     'draws in the side margins',
   );
 }
