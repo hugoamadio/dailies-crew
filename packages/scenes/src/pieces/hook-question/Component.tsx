@@ -30,6 +30,9 @@ export const HookQuestion: React.FC<{ params: HookQuestionParams }> = ({ params 
     [params.question, brand.headingFamily, brand.headingWeight],
   );
   const emphasis = new Set((params.emphasis ?? '').split(/\s+/).map(normalize).filter(Boolean));
+  const wordCount = lines.reduce((total, line) => total + line.split(' ').length, 0);
+  // Short questions keep a 3-frame rhythm; long ones compress so every entrance starts by frame 24
+  const stagger = Math.min(3, 20 / Math.max(1, wordCount - 1));
   let wordIndex = 0;
 
   return (
@@ -49,9 +52,9 @@ export const HookQuestion: React.FC<{ params: HookQuestionParams }> = ({ params 
           <div key={lineIndex} style={{ whiteSpace: 'nowrap' }}>
             {line.split(' ').map((word, position, words) => {
               const index = wordIndex++;
-              const progress = enter(4 + index * 3);
+              const progress = enter(4 + index * stagger);
               const emphasized = emphasis.has(normalize(word));
-              const underline = interpolate(frame, [20 + index * 3, 34 + index * 3], [0, 100], CLAMP);
+              const underline = interpolate(frame, [12 + index * stagger, 24 + index * stagger], [0, 100], CLAMP);
               return (
                 <span
                   key={index}

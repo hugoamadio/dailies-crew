@@ -27,6 +27,9 @@ export const HookBurst: React.FC<{ params: HookBurstParams }> = ({ params }) => 
       ),
     [params.text, brand.headingFamily, brand.headingWeight],
   );
+  const letters = [...params.text];
+  // The rays-and-letters rhythm compresses for long text so the last letter starts by frame 10
+  const stagger = Math.min(2, 10 / Math.max(1, letters.length - 1));
   const burst = interpolate(frame, [0, 14], [0, 1], { ...CLAMP, easing: EASE_OUT });
   // The rays and the ring are gone by frame 22: the settled frame stays inside the content area
   const raysOpacity = interpolate(frame, [4, 22], [1, 0], CLAMP);
@@ -70,9 +73,9 @@ export const HookBurst: React.FC<{ params: HookBurstParams }> = ({ params }) => 
           textShadow: `0 10px 40px ${brand.colors.accent}66`,
         }}
       >
-        {[...params.text].map((letter, index) => {
+        {letters.map((letter, index) => {
           const landed = spring({
-            frame: Math.max(0, frame - index * 2),
+            frame: Math.max(0, frame - index * stagger),
             fps,
             config: { damping: 11, stiffness: 180, mass: 0.7 },
           });

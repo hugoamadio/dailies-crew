@@ -31,4 +31,24 @@ describe('hooks', () => {
     });
     await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
   });
+  it('the longest question is complete at the end of its shortest scene', async () => {
+    const file = await expectPieceSnapshot('hook-question-longest-min', 'hook-question', {
+      frame: 44,
+      seconds: 1.5,
+      params: { question: LONGEST_QUESTION, emphasis: 'menos de um dia' },
+      background: { kind: 'solid' },
+      light: { sweep: false, vignette: 0 },
+    });
+    await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
+  });
+  it('the longest burst has landed at the end of its shortest scene', async () => {
+    const file = await expectPieceSnapshot('hook-burst-longest-min', 'hook-burst', {
+      frame: 29,
+      seconds: 1,
+      params: { text: 'PROMOÇÃO RELÂMPAGO HOJE!' },
+      background: { kind: 'solid' },
+      light: { sweep: false, vignette: 0 },
+    });
+    await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
+  });
 });
