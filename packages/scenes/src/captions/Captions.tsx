@@ -82,7 +82,6 @@ export const Captions: React.FC<{ words: CaptionWord[]; position: 'lower' | 'cen
           textAlign: 'center',
           color: brand.colors.text,
           textShadow: '0 4px 20px rgba(0,0,0,0.6)',
-          WebkitTextStroke: '2px rgba(0,0,0,0.35)',
           transform: `scale(${0.92 + 0.08 * pageIn})`,
         }}
       >
