@@ -10,8 +10,8 @@ videos every day. You only approve or reject.
 
 ## Quick start
 
-Requirements: Node 22 or newer. Remotion brings its own FFmpeg and downloads Chrome Headless
-Shell on the first render.
+Requirements: Node 22 or newer, and internet access for every render: the fonts come from Google
+Fonts, and the first render also downloads Chrome Headless Shell. Remotion brings its own FFmpeg.
 
 ```bash
 npm install
@@ -20,8 +20,9 @@ npm run dailies -- render examples/feiraria-lamp/plan.json \
 ```
 
 The example uses a silent "fake" voice, so it needs no API key. For a real voice, create a `.env`
-file with `ELEVENLABS_API_KEY=...`, set `"provider": "elevenlabs"` and a `"voiceId"` from your
-ElevenLabs account in the plan, and render again.
+file in the repository root (next to `package.json`) with `ELEVENLABS_API_KEY=...`, set
+`"provider": "elevenlabs"` in the plan, replace the placeholder `"voiceId": "demo"` with the id of
+a real voice from your ElevenLabs account, and render again.
 
 Preview the scene library and the demo video live: `npm run studio`.
 

@@ -144,7 +144,7 @@ export function resolvePlan(
     if (body > Math.round(maxSeconds * fps)) {
       issues.push({
         path: at,
-        message: `scene lasts ${(body / fps).toFixed(1)} s, but piece "${scene.piece}" lasts at most ${maxSeconds} s; shorten its voice line or split the scene`,
+        message: `scene "${scene.id}" lasts ${(body / fps).toFixed(1)} s, but piece "${scene.piece}" lasts at most ${maxSeconds} s; shorten its voice line or split the scene`,
       });
     }
     if (body < incoming) {

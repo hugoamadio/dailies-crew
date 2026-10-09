@@ -52,7 +52,15 @@ export interface ProduceResult {
 
 /** Direction plan file → MP4: validate, stage the assets, speak the lines, resolve, render */
 export async function produceVideo(options: ProduceOptions): Promise<ProduceResult> {
-  const text = await fs.readFile(options.planFile, 'utf8');
+  let text: string;
+  try {
+    text = await fs.readFile(options.planFile, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new EngineError(`plan file not found: ${options.planFile}`);
+    }
+    throw error;
+  }
   let raw: unknown;
   try {
     raw = JSON.parse(text);

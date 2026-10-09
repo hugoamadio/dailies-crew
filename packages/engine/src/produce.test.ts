@@ -24,6 +24,15 @@ describe('produceVideo', () => {
     await expect(fs.access(path.join(dir, 'work'))).rejects.toThrow();
   });
 
+  it('names a plan file that does not exist', async () => {
+    const planFile = path.join(dir, 'missing.json');
+    const error = await produceVideo({ planFile, assetsDir: dir, voice: new FakeVoiceProvider() }).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(EngineError);
+    expect((error as Error).message).toBe(`plan file not found: ${planFile}`);
+  });
+
   it('explains a plan file that is not JSON', async () => {
     const planFile = path.join(dir, 'plan.json');
     await fs.writeFile(planFile, '{ not json');

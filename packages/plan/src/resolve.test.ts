@@ -138,7 +138,7 @@ describe('resolvePlan', () => {
       issues: [
         {
           path: 'scenes.0',
-          message: 'scene lasts 1.5 s, but piece "title" lasts at most 1 s; shorten its voice line or split the scene',
+          message: 'scene "a" lasts 1.5 s, but piece "title" lasts at most 1 s; shorten its voice line or split the scene',
         },
       ],
     });

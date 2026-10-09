@@ -28,16 +28,25 @@ async function main(argv: string[]): Promise<number> {
   } catch {
     // no .env file: the environment alone is used
   }
-  const { positionals, values } = parseArgs({
-    args: argv,
-    allowPositionals: true,
-    options: {
-      assets: { type: 'string' },
-      out: { type: 'string' },
-      voice: { type: 'string' },
-      help: { type: 'boolean', short: 'h' },
-    },
-  });
+  let args;
+  try {
+    args = parseArgs({
+      args: argv,
+      allowPositionals: true,
+      options: {
+        assets: { type: 'string' },
+        out: { type: 'string' },
+        voice: { type: 'string' },
+        help: { type: 'boolean', short: 'h' },
+      },
+    });
+  } catch (error) {
+    // an unknown option or an option without its value
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error(USAGE);
+    return 1;
+  }
+  const { positionals, values } = args;
   const [command, planFile] = positionals;
   if (values.help) {
     console.log(USAGE);
