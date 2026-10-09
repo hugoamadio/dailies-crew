@@ -1,0 +1,13 @@
+{
+  "name": "@dailies-crew/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/produce.ts", "./voice": "./src/voice/index.ts" },
+  "dependencies": {
+    "@dailies-crew/plan": "*",
+    "@dailies-crew/scenes": "*",
+    "@remotion/bundler": "4.0.534",
+    "@remotion/renderer": "4.0.534"
+  }
+}
