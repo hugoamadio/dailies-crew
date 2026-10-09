@@ -4,4 +4,5 @@ out/
 *.mp4
 packages/scenes/test/__diff__/
 packages/scenes/test/__actual__/
+packages/scenes/test/__bundle__/
 .env

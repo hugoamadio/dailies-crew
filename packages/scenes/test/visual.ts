@@ -18,6 +18,8 @@ const PUBLIC_DIR = path.join(here, 'fixtures/public');
 const SNAPSHOTS = path.join(here, '__snapshots__');
 const ACTUAL = path.join(here, '__actual__');
 const DIFF = path.join(here, '__diff__');
+/** One fixed bundle folder (git-ignored): every run replaces it instead of adding one to /tmp */
+const BUNDLE = path.join(here, '__bundle__');
 /** Share of the pixels that may change (font anti-aliasing) before a frame counts as different */
 const MAX_DIFF_RATIO = 0.005;
 
@@ -25,7 +27,8 @@ let serveUrl: Promise<string> | undefined;
 function getServeUrl(): Promise<string> {
   serveUrl ??= (async () => {
     await ensureBrowser();
-    return bundle({ entryPoint: ENTRY, publicDir: PUBLIC_DIR, enableCaching: true });
+    await fs.rm(BUNDLE, { recursive: true, force: true });
+    return bundle({ entryPoint: ENTRY, publicDir: PUBLIC_DIR, outDir: BUNDLE, enableCaching: true });
   })();
   return serveUrl;
 }

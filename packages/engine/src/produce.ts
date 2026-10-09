@@ -29,7 +29,10 @@ export interface ProduceOptions {
   assetsDir: string;
   /** Default: <workDir>/video.mp4 */
   outFile?: string;
-  /** Default: data/jobs/<timestamp>-<id> under the current directory */
+  /**
+   * Default: data/jobs/<timestamp>-<id> under the current directory. Holds public/ (staged assets
+   * and voice), bundle/ (the Remotion bundle, removed after the render) and video.mp4
+   */
   workDir?: string;
   /** Default: the plan's own provider, built from env */
   voice?: VoiceProvider;
