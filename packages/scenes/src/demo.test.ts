@@ -1,5 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { demoResolvedPlan } from './demo';
+import { DEMO_PLAN, demoResolvedPlan } from './demo';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('demo plan', () => {
   it('validates and resolves with the fake voice timings', () => {
@@ -15,5 +20,14 @@ describe('demo plan', () => {
     ]);
     expect(plan.voice).toEqual([]);
     expect(plan.captions.words.length).toBe(49);
+  });
+});
+
+describe('examples/feiraria-lamp', () => {
+  it('is the demo plan', () => {
+    const example = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, 'examples/feiraria-lamp/plan.json'), 'utf8'),
+    );
+    expect(example).toEqual(DEMO_PLAN);
   });
 });
