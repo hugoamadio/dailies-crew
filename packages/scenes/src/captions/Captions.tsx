@@ -1,5 +1,6 @@
 import type { CaptionWord } from '@dailies-crew/plan';
 import { createTikTokStyleCaptions } from '@remotion/captions';
+import { fitTextOnNLines } from '@remotion/layout-utils';
 import { useMemo } from 'react';
 import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { useBrand } from '../theme/brand';
@@ -27,6 +28,26 @@ export const Captions: React.FC<{ words: CaptionWord[]; position: 'lower' | 'cen
   const nowMs = (frame / fps) * 1000;
   const page = pages.find(
     (candidate) => nowMs >= candidate.startMs && nowMs < candidate.startMs + candidate.durationMs,
+  );
+  const pageText = page
+    ? page.tokens
+        .map((token) => token.text)
+        .join('')
+        .trim()
+    : '';
+  const fontSize = useMemo(
+    () =>
+      pageText
+        ? fitTextOnNLines({
+            text: pageText,
+            maxLines: 2,
+            maxBoxWidth: SAFE_WIDTH,
+            fontFamily: brand.headingFamily,
+            fontWeight: brand.headingWeight,
+            maxFontSize: 70,
+          }).fontSize
+        : 70,
+    [pageText, brand.headingFamily, brand.headingWeight],
   );
   if (!page) return null;
 
@@ -57,7 +78,7 @@ export const Captions: React.FC<{ words: CaptionWord[]; position: 'lower' | 'cen
           maxWidth: SAFE_WIDTH,
           fontFamily: brand.headingFamily,
           fontWeight: brand.headingWeight,
-          fontSize: 70,
+          fontSize,
           lineHeight: 1.12,
           textAlign: 'center',
           color: brand.colors.text,
@@ -71,7 +92,7 @@ export const Captions: React.FC<{ words: CaptionWord[]; position: 'lower' | 'cen
           return (
             <span
               key={token.fromMs}
-              style={{ whiteSpace: 'pre', color: active ? brand.colors.accent : undefined }}
+              style={{ whiteSpace: 'pre-wrap', color: active ? brand.colors.accent : undefined }}
             >
               {token.text}
             </span>

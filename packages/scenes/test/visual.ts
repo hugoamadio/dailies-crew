@@ -10,7 +10,7 @@ import { expect } from 'vitest';
 import { DEMO_BRAND } from '../src/demo';
 import type { PiecePreviewProps } from '../src/PiecePreview';
 import { pieceCatalog } from '../src/specs';
-import { CONTENT_AREA } from '../src/theme/safe-area';
+import { CONTENT_AREA, SAFE_AREA } from '../src/theme/safe-area';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ENTRY = path.join(here, '../src/index.ts');
@@ -100,23 +100,24 @@ export async function expectPieceSnapshot(
   return file;
 }
 
-/**
- * Fails when anything but the background color was drawn outside the content area (the margins
- * the social apps cover, plus the caption band). Render with a solid background to use it.
- */
-export async function expectMarginsEmpty(file: string, backgroundHex: string): Promise<void> {
+type Region = (x: number, y: number, width: number, height: number) => boolean;
+
+/** Fails when more than 0.1% of the sampled pixels of the region differ from the background color */
+async function expectRegionEmpty(
+  file: string,
+  backgroundHex: string,
+  inRegion: Region,
+  message: string,
+) {
   const png = PNG.sync.read(await fs.readFile(file));
-  const background = [1, 3, 5].map((offset) => Number.parseInt(backgroundHex.slice(offset, offset + 2), 16));
+  const background = [1, 3, 5].map((offset) =>
+    Number.parseInt(backgroundHex.slice(offset, offset + 2), 16),
+  );
   let drawn = 0;
   let checked = 0;
   for (let y = 0; y < png.height; y += 2) {
     for (let x = 0; x < png.width; x += 2) {
-      const inside =
-        x >= CONTENT_AREA.left &&
-        x < png.width - CONTENT_AREA.right &&
-        y >= CONTENT_AREA.top &&
-        y < png.height - CONTENT_AREA.bottom;
-      if (inside) continue;
+      if (!inRegion(x, y, png.width, png.height)) continue;
       checked += 1;
       const index = (y * png.width + x) * 4;
       const differs = [0, 1, 2].some(
@@ -125,5 +126,34 @@ export async function expectMarginsEmpty(file: string, backgroundHex: string): P
       if (differs) drawn += 1;
     }
   }
-  expect(drawn / checked, `${path.basename(file)} draws outside the content area`).toBeLessThanOrEqual(0.001);
+  expect(drawn / checked, `${path.basename(file)} ${message}`).toBeLessThanOrEqual(0.001);
+}
+
+/**
+ * Fails when anything but the background color was drawn outside the content area (the margins
+ * the social apps cover, plus the caption band). Render with a solid background to use it.
+ */
+export async function expectMarginsEmpty(file: string, backgroundHex: string): Promise<void> {
+  await expectRegionEmpty(
+    file,
+    backgroundHex,
+    (x, y, width, height) =>
+      !(
+        x >= CONTENT_AREA.left &&
+        x < width - CONTENT_AREA.right &&
+        y >= CONTENT_AREA.top &&
+        y < height - CONTENT_AREA.bottom
+      ),
+    'draws outside the content area',
+  );
+}
+
+/** Like expectMarginsEmpty, but only the left and right margins over the full height (captions live in the caption band) */
+export async function expectSideMarginsEmpty(file: string, backgroundHex: string): Promise<void> {
+  await expectRegionEmpty(
+    file,
+    backgroundHex,
+    (x, _y, width) => x < SAFE_AREA.left || x >= width - SAFE_AREA.right,
+    'draws in the side margins',
+  );
 }

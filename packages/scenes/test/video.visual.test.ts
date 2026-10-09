@@ -1,9 +1,14 @@
 import type { ResolvedPlan, ResolvedScene, TransitionKind } from '@dailies-crew/plan';
 import { describe, it } from 'vitest';
 import { DEMO_BRAND, demoResolvedPlan } from '../src/demo';
-import { expectSnapshot, renderComposition } from './visual';
+import { expectSideMarginsEmpty, expectSnapshot, renderComposition } from './visual';
 
-const title = (id: string, lines: string[], from: number, durationInFrames: number): ResolvedScene => ({
+const title = (
+  id: string,
+  lines: string[],
+  from: number,
+  durationInFrames: number,
+): ResolvedScene => ({
   id,
   piece: 'kinetic-title',
   params: { lines, align: 'center', highlight: 0 },
@@ -38,12 +43,58 @@ describe('the video composition', () => {
     'transition %s halfway through',
     async (kind) => {
       const name = `transition-${kind}`;
-      await expectSnapshot(name, await renderComposition('DailiesVideo', { plan: twoScenes(kind) }, 66, name));
+      await expectSnapshot(
+        name,
+        await renderComposition('DailiesVideo', { plan: twoScenes(kind) }, 66, name),
+      );
     },
   );
 
   it('captions on the demo, while "Luminária" is spoken', async () => {
     const name = 'video-captions';
-    await expectSnapshot(name, await renderComposition('DailiesVideo', { plan: demoResolvedPlan() }, 150, name));
+    await expectSnapshot(
+      name,
+      await renderComposition('DailiesVideo', { plan: demoResolvedPlan() }, 150, name),
+    );
+  });
+
+  it('a long caption page wraps inside the safe area', async () => {
+    const texts = ['Luminária', ' Lua,', ' impressa', ' em', ' 3D', ' camada', ' por', ' camada.'];
+    const words = texts.map((text, index) => ({
+      text,
+      startMs: index * 100,
+      endMs: index * 100 + 90,
+      timestampMs: null,
+      confidence: null,
+      ...(index === texts.length - 1 ? { pageBreakAfter: true } : {}),
+    }));
+    const plan: ResolvedPlan = {
+      version: 1,
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      durationInFrames: 60,
+      brand: DEMO_BRAND,
+      captions: { enabled: true, position: 'lower', words },
+      scenes: [
+        {
+          id: 'only',
+          piece: 'kinetic-title',
+          params: { lines: ['Legenda'], align: 'center', highlight: 0 },
+          camera: { move: 'static', intensity: 'medium' },
+          light: { sweep: false, vignette: 0 },
+          background: { kind: 'solid' },
+          from: 0,
+          durationInFrames: 60,
+          transitionOut: null,
+        },
+      ],
+      voice: [],
+      music: null,
+    };
+    const name = 'captions-long-page';
+    const file = await renderComposition('DailiesVideo', { plan }, 15, name);
+    await expectSnapshot(name, file);
+    await expectSideMarginsEmpty(file, DEMO_BRAND.colors.background);
   });
 });
