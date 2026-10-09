@@ -36,7 +36,8 @@ export function musicVolumeAt(
 ): number {
   let distance = Number.POSITIVE_INFINITY;
   for (const span of speechSpans(voice)) {
-    const away = frame < span.from ? span.from - frame : frame >= span.end ? frame - span.end + 1 : 0;
+    const away =
+      frame < span.from ? span.from - frame : frame >= span.end ? frame - span.end + 1 : 0;
     distance = Math.min(distance, away);
   }
   const base =

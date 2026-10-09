@@ -23,7 +23,12 @@ export async function synthesizeVoice(
     });
     const src = `voice/${line.id}.${result.extension}`;
     await fs.writeFile(path.join(publicDir, src), result.audio);
-    tracks.push({ lineId: line.id, src, words: result.words, durationSeconds: result.durationSeconds });
+    tracks.push({
+      lineId: line.id,
+      src,
+      words: result.words,
+      durationSeconds: result.durationSeconds,
+    });
     characters += result.characters;
   }
   return { tracks, characters };

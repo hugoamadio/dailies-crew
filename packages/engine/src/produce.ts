@@ -77,14 +77,20 @@ export async function produceVideo(options: ProduceOptions): Promise<ProduceResu
 
   const workDir =
     options.workDir ??
-    path.join(process.cwd(), 'data', 'jobs', `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`);
+    path.join(
+      process.cwd(),
+      'data',
+      'jobs',
+      `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`,
+    );
   const publicDir = path.join(workDir, 'public');
   await fs.mkdir(publicDir, { recursive: true });
 
   options.onStage?.('assets');
   await stageAssets(collectAssetPaths(plan, pieceCatalog), options.assetsDir, publicDir);
 
-  const provider = options.voice ?? createVoiceProvider(plan.voice.provider, options.env ?? process.env);
+  const provider =
+    options.voice ?? createVoiceProvider(plan.voice.provider, options.env ?? process.env);
   options.onStage?.('voice', provider.name);
   const { tracks, characters } = await synthesizeVoice(plan, provider, publicDir);
 
@@ -95,7 +101,12 @@ export async function produceVideo(options: ProduceOptions): Promise<ProduceResu
   const outFile = options.outFile ?? path.join(workDir, 'video.mp4');
   await fs.mkdir(path.dirname(outFile), { recursive: true });
   options.onStage?.('render');
-  await renderVideo({ resolved: resolved.value, publicDir, outFile, onProgress: options.onRenderProgress });
+  await renderVideo({
+    resolved: resolved.value,
+    publicDir,
+    outFile,
+    onProgress: options.onRenderProgress,
+  });
 
   options.onStage?.('done', outFile);
   return {

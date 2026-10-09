@@ -54,7 +54,12 @@ export const HookQuestion: React.FC<{ params: HookQuestionParams }> = ({ params 
               const index = wordIndex++;
               const progress = enter(4 + index * stagger);
               const emphasized = emphasis.has(normalize(word));
-              const underline = interpolate(frame, [12 + index * stagger, 24 + index * stagger], [0, 100], CLAMP);
+              const underline = interpolate(
+                frame,
+                [12 + index * stagger, 24 + index * stagger],
+                [0, 100],
+                CLAMP,
+              );
               return (
                 <span
                   key={index}

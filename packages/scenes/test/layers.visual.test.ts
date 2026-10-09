@@ -6,8 +6,10 @@ const SOLID = { kind: 'solid' } as const;
 const NO_LIGHT = { sweep: false, vignette: 0 } as const;
 
 describe('kinetic title and the layers', () => {
-  it('settled on the default gradient', () => expectPieceSnapshot('kinetic-title', 'kinetic-title', { frame: 45 }));
-  it('mid-entrance', () => expectPieceSnapshot('kinetic-title-entering', 'kinetic-title', { frame: 8 }));
+  it('settled on the default gradient', () =>
+    expectPieceSnapshot('kinetic-title', 'kinetic-title', { frame: 45 }));
+  it('mid-entrance', () =>
+    expectPieceSnapshot('kinetic-title-entering', 'kinetic-title', { frame: 8 }));
   it.each([
     ['solid', { kind: 'solid' }],
     ['particles', { kind: 'particles', density: 'high' }],
@@ -31,7 +33,10 @@ describe('kinetic title and the layers', () => {
       camera: { move: 'rack-focus', intensity: 'medium' },
     }));
   it('light sweep and a strong vignette', () =>
-    expectPieceSnapshot('light-sweep', 'kinetic-title', { frame: 45, light: { sweep: true, vignette: 0.9 } }));
+    expectPieceSnapshot('light-sweep', 'kinetic-title', {
+      frame: 45,
+      light: { sweep: true, vignette: 0.9 },
+    }));
   it('strong push-in keeps the title inside the content area at its peak', async () => {
     const file = await expectPieceSnapshot('camera-push-in-strong-peak', 'kinetic-title', {
       frame: 89,
@@ -41,13 +46,16 @@ describe('kinetic title and the layers', () => {
     });
     await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
   });
-  it.each(['left', 'right'] as const)('strong pans keep the title inside the content area at the end of the move (%s)', async (side) => {
-    const file = await expectPieceSnapshot(`camera-pan-${side}-strong-end`, 'kinetic-title', {
-      frame: 89,
-      background: SOLID,
-      light: NO_LIGHT,
-      camera: { move: side === 'left' ? 'pan-left' : 'pan-right', intensity: 'strong' },
-    });
-    await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
-  });
+  it.each(['left', 'right'] as const)(
+    'strong pans keep the title inside the content area at the end of the move (%s)',
+    async (side) => {
+      const file = await expectPieceSnapshot(`camera-pan-${side}-strong-end`, 'kinetic-title', {
+        frame: 89,
+        background: SOLID,
+        light: NO_LIGHT,
+        camera: { move: side === 'left' ? 'pan-left' : 'pan-right', intensity: 'strong' },
+      });
+      await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
+    },
+  );
 });

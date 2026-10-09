@@ -35,7 +35,10 @@ export function validatePlan(raw: unknown, catalog: PieceCatalog): Result<Plan> 
     if (scene.timing.kind === 'line') {
       const uses = lineUses.get(scene.timing.lineId);
       if (uses === undefined) {
-        issues.push({ path: `${at}.timing.lineId`, message: `no voice line "${scene.timing.lineId}"` });
+        issues.push({
+          path: `${at}.timing.lineId`,
+          message: `no voice line "${scene.timing.lineId}"`,
+        });
       } else {
         lineUses.set(scene.timing.lineId, uses + 1);
       }
@@ -89,7 +92,9 @@ export function validatePlan(raw: unknown, catalog: PieceCatalog): Result<Plan> 
       issues.push({
         path: 'voice.lines',
         message:
-          uses === 0 ? `line "${id}" is not used by any scene` : `line "${id}" is used by ${uses} scenes`,
+          uses === 0
+            ? `line "${id}" is not used by any scene`
+            : `line "${id}" is used by ${uses} scenes`,
       });
     }
   }

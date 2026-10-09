@@ -1,0 +1,7 @@
+.superpowers
+package-lock.json
+node_modules
+data
+out
+packages/scenes/test/__snapshots__
+packages/scenes/test/__bundle__

@@ -26,10 +26,20 @@ export interface RenderOptions {
  * bundle is deleted afterwards, whether the render succeeds or fails (webpack's own cache still
  * speeds up the next bundle).
  */
-export async function renderVideo({ resolved, publicDir, outFile, onProgress }: RenderOptions): Promise<void> {
+export async function renderVideo({
+  resolved,
+  publicDir,
+  outFile,
+  onProgress,
+}: RenderOptions): Promise<void> {
   const outDir = path.join(path.dirname(publicDir), 'bundle');
   try {
-    const serveUrl = await bundle({ entryPoint: SCENES_ENTRY, publicDir, outDir, enableCaching: true });
+    const serveUrl = await bundle({
+      entryPoint: SCENES_ENTRY,
+      publicDir,
+      outDir,
+      enableCaching: true,
+    });
     const inputProps = { plan: resolved };
     const composition = await selectComposition({ serveUrl, id: 'DailiesVideo', inputProps });
     await renderMedia({

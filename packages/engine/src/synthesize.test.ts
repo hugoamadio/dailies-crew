@@ -8,7 +8,13 @@ import { synthesizeVoice } from './synthesize';
 import { FakeVoiceProvider, type SynthesisRequest, type VoiceProvider } from './voice';
 
 const brand = {
-  colors: { background: '#101010', surface: '#202020', text: '#ffffff', primary: '#333333', accent: '#ffc83d' },
+  colors: {
+    background: '#101010',
+    surface: '#202020',
+    text: '#ffffff',
+    primary: '#333333',
+    accent: '#ffc83d',
+  },
   headingFont: 'Montserrat',
   bodyFont: 'Inter',
 };
@@ -29,8 +35,18 @@ describe('synthesizeVoice', () => {
           ],
         },
         scenes: [
-          { id: 'a', piece: 'kinetic-title', params: { lines: ['A'] }, timing: { kind: 'line', lineId: 'one' } },
-          { id: 'b', piece: 'kinetic-title', params: { lines: ['B'] }, timing: { kind: 'line', lineId: 'two' } },
+          {
+            id: 'a',
+            piece: 'kinetic-title',
+            params: { lines: ['A'] },
+            timing: { kind: 'line', lineId: 'one' },
+          },
+          {
+            id: 'b',
+            piece: 'kinetic-title',
+            params: { lines: ['B'] },
+            timing: { kind: 'line', lineId: 'two' },
+          },
         ],
       },
       pieceCatalog,

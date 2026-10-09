@@ -23,7 +23,13 @@ const catalog = catalogFromSpecs([anySpec('title'), anySpec('photo')]);
 const wide: PieceLimits = () => ({ minSeconds: 0.5, maxSeconds: 30 });
 
 const brand = {
-  colors: { background: '#101010', surface: '#202020', text: '#ffffff', primary: '#333333', accent: '#ffc83d' },
+  colors: {
+    background: '#101010',
+    surface: '#202020',
+    text: '#ffffff',
+    primary: '#333333',
+    accent: '#ffc83d',
+  },
   headingFont: 'Montserrat' as const,
   bodyFont: 'Inter' as const,
 };
@@ -62,7 +68,13 @@ describe('resolvePlan', () => {
   it('turns lines and seconds into frames, overlapping only the transition', () => {
     const resolved = resolvePlan(
       plan([
-        { id: 'a', piece: 'title', params: {}, timing: { kind: 'line', lineId: 'one' }, transitionOut: { kind: 'fade' } },
+        {
+          id: 'a',
+          piece: 'title',
+          params: {},
+          timing: { kind: 'line', lineId: 'one' },
+          transitionOut: { kind: 'fade' },
+        },
         { id: 'b', piece: 'photo', params: {}, timing: { kind: 'seconds', seconds: 14 } },
       ]),
       [track('one')],
@@ -75,10 +87,19 @@ describe('resolvePlan', () => {
       ['b', 45, 420, null],
     ]);
     expect(value.durationInFrames).toBe(465);
-    expect(value.voice).toEqual([{ lineId: 'one', src: 'voice/one.wav', from: 6, durationInFrames: 30 }]);
+    expect(value.voice).toEqual([
+      { lineId: 'one', src: 'voice/one.wav', from: 6, durationInFrames: 30 },
+    ]);
     expect(value.captions.words).toEqual([
       { text: 'Olá', startMs: 250, endMs: 600, timestampMs: null, confidence: null },
-      { text: ' mundo', startMs: 650, endMs: 1100, timestampMs: null, confidence: null, pageBreakAfter: true },
+      {
+        text: ' mundo',
+        startMs: 650,
+        endMs: 1100,
+        timestampMs: null,
+        confidence: null,
+        pageBreakAfter: true,
+      },
     ]);
     expect(value.music).toEqual({ src: 'assets/music/loop.mp3', volume: 0.22, duckTo: 0.07 });
     expect([value.width, value.height, value.fps]).toEqual([1080, 1920, 30]);
@@ -87,7 +108,13 @@ describe('resolvePlan', () => {
   it('starts the voice later when a long transition comes into its scene', () => {
     const resolved = resolvePlan(
       plan([
-        { id: 'a', piece: 'photo', params: {}, timing: { kind: 'seconds', seconds: 14 }, transitionOut: { kind: 'slide', seconds: 1 } },
+        {
+          id: 'a',
+          piece: 'photo',
+          params: {},
+          timing: { kind: 'seconds', seconds: 14 },
+          transitionOut: { kind: 'slide', seconds: 1 },
+        },
         { id: 'b', piece: 'title', params: {}, timing: { kind: 'line', lineId: 'one' } },
       ]),
       [track('one')],
@@ -100,7 +127,13 @@ describe('resolvePlan', () => {
   it('treats a cut as no transition at all', () => {
     const resolved = resolvePlan(
       plan([
-        { id: 'a', piece: 'title', params: {}, timing: { kind: 'line', lineId: 'one' }, transitionOut: { kind: 'cut' } },
+        {
+          id: 'a',
+          piece: 'title',
+          params: {},
+          timing: { kind: 'line', lineId: 'one' },
+          transitionOut: { kind: 'cut' },
+        },
         { id: 'b', piece: 'photo', params: {}, timing: { kind: 'seconds', seconds: 14 } },
       ]),
       [track('one')],
@@ -118,7 +151,8 @@ describe('resolvePlan', () => {
         { id: 'b', piece: 'photo', params: {}, timing: { kind: 'seconds', seconds: 13 } },
       ]),
       [track('one')],
-      (id) => (id === 'title' ? { minSeconds: 3, maxSeconds: 30 } : { minSeconds: 0.5, maxSeconds: 30 }),
+      (id) =>
+        id === 'title' ? { minSeconds: 3, maxSeconds: 30 } : { minSeconds: 0.5, maxSeconds: 30 },
     );
     if (!resolved.ok) throw new Error(JSON.stringify(resolved.issues));
     expect(resolved.value.scenes[0]?.durationInFrames).toBe(90);
@@ -131,14 +165,16 @@ describe('resolvePlan', () => {
         { id: 'b', piece: 'photo', params: {}, timing: { kind: 'seconds', seconds: 14 } },
       ]),
       [track('one')],
-      (id) => (id === 'title' ? { minSeconds: 0.5, maxSeconds: 1 } : { minSeconds: 0.5, maxSeconds: 30 }),
+      (id) =>
+        id === 'title' ? { minSeconds: 0.5, maxSeconds: 1 } : { minSeconds: 0.5, maxSeconds: 30 },
     );
     expect(resolved).toEqual({
       ok: false,
       issues: [
         {
           path: 'scenes.0',
-          message: 'scene "a" lasts 1.5 s, but piece "title" lasts at most 1 s; shorten its voice line or split the scene',
+          message:
+            'scene "a" lasts 1.5 s, but piece "title" lasts at most 1 s; shorten its voice line or split the scene',
         },
       ],
     });
@@ -147,8 +183,20 @@ describe('resolvePlan', () => {
   it('refuses a scene shorter than the transition coming into it', () => {
     const resolved = resolvePlan(
       plan([
-        { id: 'a', piece: 'title', params: {}, timing: { kind: 'line', lineId: 'one' }, transitionOut: { kind: 'fade', seconds: 1 } },
-        { id: 'b', piece: 'photo', params: {}, timing: { kind: 'seconds', seconds: 0.5 }, transitionOut: { kind: 'fade' } },
+        {
+          id: 'a',
+          piece: 'title',
+          params: {},
+          timing: { kind: 'line', lineId: 'one' },
+          transitionOut: { kind: 'fade', seconds: 1 },
+        },
+        {
+          id: 'b',
+          piece: 'photo',
+          params: {},
+          timing: { kind: 'seconds', seconds: 0.5 },
+          transitionOut: { kind: 'fade' },
+        },
         { id: 'c', piece: 'photo', params: {}, timing: { kind: 'seconds', seconds: 14 } },
       ]),
       [track('one')],

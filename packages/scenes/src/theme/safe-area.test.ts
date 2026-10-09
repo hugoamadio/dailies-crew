@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { CAPTION_BAND, CONTENT_AREA, CONTENT_HEIGHT, CONTENT_WIDTH, SAFE_AREA, SAFE_HEIGHT, SAFE_WIDTH } from './safe-area';
+import {
+  CAPTION_BAND,
+  CONTENT_AREA,
+  CONTENT_HEIGHT,
+  CONTENT_WIDTH,
+  SAFE_AREA,
+  SAFE_HEIGHT,
+  SAFE_WIDTH,
+} from './safe-area';
 
 describe('safe area', () => {
   it('keeps the content area inside the safe area, above the caption band', () => {

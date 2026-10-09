@@ -22,7 +22,9 @@ afterEach(() => fs.rm(root, { recursive: true, force: true }));
 describe('stageAssets', () => {
   it('copies each asset under public/assets, keeping its path', async () => {
     await stageAssets(['products/lamp.svg'], assets(), publicDir());
-    expect(await fs.readFile(path.join(publicDir(), 'assets/products/lamp.svg'), 'utf8')).toBe('<svg/>');
+    expect(await fs.readFile(path.join(publicDir(), 'assets/products/lamp.svg'), 'utf8')).toBe(
+      '<svg/>',
+    );
   });
 
   it.each([

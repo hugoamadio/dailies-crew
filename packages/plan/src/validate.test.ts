@@ -106,7 +106,10 @@ describe('validatePlan', () => {
   it('refuses duplicate scene ids', () => {
     const plan = basePlan();
     plan.scenes[1]!.id = 'a';
-    expect(issuesOf(plan)).toContainEqual({ path: 'scenes.1.id', message: 'duplicate scene id "a"' });
+    expect(issuesOf(plan)).toContainEqual({
+      path: 'scenes.1.id',
+      message: 'duplicate scene id "a"',
+    });
   });
 
   it('refuses a scene tied to a missing line, and a line no scene uses', () => {
@@ -143,14 +146,18 @@ describe('validatePlan', () => {
     ]);
   });
 
-  it.each(['../secret.png', '/etc/x.png', 'a/../../b.png', 'C:\\x.png', 'products//lamp.png', 'products/lamp.exe'])(
-    'refuses the asset path %s',
-    (image) => {
-      const plan = basePlan();
-      plan.scenes[1]!.params = { image };
-      expect(issuesOf(plan).map((issue) => issue.path)).toEqual(['scenes.1.params.image']);
-    },
-  );
+  it.each([
+    '../secret.png',
+    '/etc/x.png',
+    'a/../../b.png',
+    'C:\\x.png',
+    'products//lamp.png',
+    'products/lamp.exe',
+  ])('refuses the asset path %s', (image) => {
+    const plan = basePlan();
+    plan.scenes[1]!.params = { image };
+    expect(issuesOf(plan).map((issue) => issue.path)).toEqual(['scenes.1.params.image']);
+  });
 
   it('refuses an unknown or misspelled plan field', () => {
     expect(issuesOf({ ...basePlan(), musc: {} })).toEqual([

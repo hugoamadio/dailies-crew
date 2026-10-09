@@ -7,7 +7,11 @@ import { EngineError } from './errors';
  * Copies the plan's assets to <publicDir>/assets/<path>, the folder Remotion serves while rendering.
  * Plans come from agents: a path must stay inside the assets folder even through symlinks.
  */
-export async function stageAssets(paths: readonly string[], assetsDir: string, publicDir: string): Promise<void> {
+export async function stageAssets(
+  paths: readonly string[],
+  assetsDir: string,
+  publicDir: string,
+): Promise<void> {
   const root = await fs.realpath(assetsDir);
   for (const relativePath of paths) {
     if (!isSafeRelativePath(relativePath)) {

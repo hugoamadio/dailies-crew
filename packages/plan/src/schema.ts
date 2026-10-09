@@ -81,7 +81,10 @@ const VoiceSchema = z.strictObject({
   voiceId: z.string().min(1).max(100),
   /** BCP 47, e.g. "pt-BR" */
   language: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/, 'must look like "pt-BR" or "en"'),
-  lines: z.array(z.strictObject({ id: Slug, text: z.string().trim().min(1).max(400) })).min(1).max(20),
+  lines: z
+    .array(z.strictObject({ id: Slug, text: z.string().trim().min(1).max(400) }))
+    .min(1)
+    .max(20),
 });
 
 const MusicSchema = z.strictObject({

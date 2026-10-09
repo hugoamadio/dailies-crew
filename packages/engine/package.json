@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/produce.ts", "./voice": "./src/voice/index.ts" },
+  "exports": {
+    ".": "./src/produce.ts",
+    "./voice": "./src/voice/index.ts"
+  },
   "dependencies": {
     "@dailies-crew/plan": "*",
     "@dailies-crew/scenes": "*",

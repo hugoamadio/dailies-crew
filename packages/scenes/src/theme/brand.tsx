@@ -3,15 +3,24 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { cancelRender, continueRender, delayRender } from 'remotion';
 import { FONT_TABLE, loadBrandFont } from './fonts';
 
-export type ThemeBrand = Brand & { headingFamily: string; bodyFamily: string; headingWeight: number };
+export type ThemeBrand = Brand & {
+  headingFamily: string;
+  bodyFamily: string;
+  headingWeight: number;
+};
 
 const BrandContext = createContext<ThemeBrand | null>(null);
 
 /** Gives every scene the brand, and holds the render until the brand fonts are loaded */
-export const BrandProvider: React.FC<{ brand: Brand; children: React.ReactNode }> = ({ brand, children }) => {
+export const BrandProvider: React.FC<{ brand: Brand; children: React.ReactNode }> = ({
+  brand,
+  children,
+}) => {
   const heading = loadBrandFont(brand.headingFont);
   const body = loadBrandFont(brand.bodyFont);
-  const [handle] = useState(() => delayRender(`Loading the fonts ${brand.headingFont} and ${brand.bodyFont}`));
+  const [handle] = useState(() =>
+    delayRender(`Loading the fonts ${brand.headingFont} and ${brand.bodyFont}`),
+  );
   const [ready, setReady] = useState(false);
 
   useEffect(() => {

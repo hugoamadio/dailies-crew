@@ -2,7 +2,8 @@ import { describe, it } from 'vitest';
 import { DEMO_BRAND } from '../src/demo';
 import { expectMarginsEmpty, expectPieceSnapshot } from './visual';
 
-const LONGEST_QUESTION = 'Você sabia que dá para imprimir em 3D uma luminária inteira em menos de um dia?';
+const LONGEST_QUESTION =
+  'Você sabia que dá para imprimir em 3D uma luminária inteira em menos de um dia?';
 
 describe('hooks', () => {
   it('question with an underlined emphasis', async () => {

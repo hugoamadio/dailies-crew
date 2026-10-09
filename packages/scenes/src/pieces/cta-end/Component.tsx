@@ -70,7 +70,13 @@ export const CtaEnd: React.FC<{ params: CtaEndParams }> = ({ params }) => {
           />
           <Img
             src={assetUrl(logo)}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+            }}
           />
         </div>
       ) : null}

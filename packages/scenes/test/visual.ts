@@ -30,7 +30,12 @@ function getServeUrl(): Promise<string> {
   serveUrl ??= (async () => {
     await ensureBrowser();
     await fs.rm(BUNDLE, { recursive: true, force: true });
-    return bundle({ entryPoint: ENTRY, publicDir: PUBLIC_DIR, outDir: BUNDLE, enableCaching: true });
+    return bundle({
+      entryPoint: ENTRY,
+      publicDir: PUBLIC_DIR,
+      outDir: BUNDLE,
+      enableCaching: true,
+    });
   })();
   return serveUrl;
 }

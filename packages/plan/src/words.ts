@@ -16,7 +16,11 @@ export function fakeWords(text: string): { words: Word[]; durationSeconds: numbe
     .trim()
     .split(/\s+/)
     .map((token) => {
-      const word = { text: token, startSeconds: ms(start), endSeconds: ms(start + FAKE_WORD_SECONDS) };
+      const word = {
+        text: token,
+        startSeconds: ms(start),
+        endSeconds: ms(start + FAKE_WORD_SECONDS),
+      };
       start += FAKE_WORD_SECONDS + FAKE_GAP_SECONDS;
       return word;
     });

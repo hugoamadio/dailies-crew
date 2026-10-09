@@ -126,7 +126,12 @@ export function resolvePlan(
       const speech = Math.ceil(track.durationSeconds * fps);
       body = Math.max(lead + speech + TAIL_FRAMES, Math.round(minSeconds * fps));
       const voiceFrom = from + lead;
-      voice.push({ lineId: track.lineId, src: track.src, from: voiceFrom, durationInFrames: speech });
+      voice.push({
+        lineId: track.lineId,
+        src: track.src,
+        from: voiceFrom,
+        durationInFrames: speech,
+      });
       track.words.forEach((word, wordIndex) => {
         words.push({
           text: wordIndex === 0 ? word.text : ` ${word.text}`,
@@ -192,7 +197,11 @@ export function resolvePlan(
       scenes,
       voice,
       music: plan.music
-        ? { src: `assets/${plan.music.track}`, volume: plan.music.volume, duckTo: plan.music.duckTo }
+        ? {
+            src: `assets/${plan.music.track}`,
+            volume: plan.music.volume,
+            duckTo: plan.music.duckTo,
+          }
         : null,
     },
   };

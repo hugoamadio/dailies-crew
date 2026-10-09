@@ -5,8 +5,12 @@
   "description": "An open-source video factory where crews of AI agents create, direct, edit and review short videos every day.",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=22" },
-  "workspaces": ["packages/*"],
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "test": "vitest run",
     "test:visual": "vitest run --config vitest.visual.config.ts",

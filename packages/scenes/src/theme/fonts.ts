@@ -15,15 +15,18 @@ interface FontEntry {
 /** "latin-ext" carries the Portuguese accents */
 export const FONT_TABLE: Record<FontName, FontEntry> = {
   Inter: {
-    load: () => loadInter('normal', { weights: ['400', '700', '900'], subsets: ['latin', 'latin-ext'] }),
+    load: () =>
+      loadInter('normal', { weights: ['400', '700', '900'], subsets: ['latin', 'latin-ext'] }),
     headingWeight: 900,
   },
   Montserrat: {
-    load: () => loadMontserrat('normal', { weights: ['400', '700', '900'], subsets: ['latin', 'latin-ext'] }),
+    load: () =>
+      loadMontserrat('normal', { weights: ['400', '700', '900'], subsets: ['latin', 'latin-ext'] }),
     headingWeight: 900,
   },
   Poppins: {
-    load: () => loadPoppins('normal', { weights: ['400', '700', '900'], subsets: ['latin', 'latin-ext'] }),
+    load: () =>
+      loadPoppins('normal', { weights: ['400', '700', '900'], subsets: ['latin', 'latin-ext'] }),
     headingWeight: 900,
   },
   'Bebas Neue': {
@@ -31,11 +34,16 @@ export const FONT_TABLE: Record<FontName, FontEntry> = {
     headingWeight: 400,
   },
   'Playfair Display': {
-    load: () => loadPlayfairDisplay('normal', { weights: ['400', '700', '900'], subsets: ['latin', 'latin-ext'] }),
+    load: () =>
+      loadPlayfairDisplay('normal', {
+        weights: ['400', '700', '900'],
+        subsets: ['latin', 'latin-ext'],
+      }),
     headingWeight: 900,
   },
   'Space Grotesk': {
-    load: () => loadSpaceGrotesk('normal', { weights: ['400', '700'], subsets: ['latin', 'latin-ext'] }),
+    load: () =>
+      loadSpaceGrotesk('normal', { weights: ['400', '700'], subsets: ['latin', 'latin-ext'] }),
     headingWeight: 700,
   },
 };

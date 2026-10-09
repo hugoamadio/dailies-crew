@@ -6,7 +6,10 @@ const KEY = 'secret-key-123';
 
 function respond(status: number, body: unknown) {
   return vi.fn().mockResolvedValue(
-    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    }),
   );
 }
 
@@ -56,8 +59,16 @@ describe('ElevenLabsVoiceProvider', () => {
   });
 
   it.each([
-    [401, { detail: { status: 'invalid_api_key', message: 'Invalid API key' } }, 'ElevenLabs answered 401: Invalid API key'],
-    [429, { detail: 'Too many concurrent requests' }, 'ElevenLabs answered 429: Too many concurrent requests'],
+    [
+      401,
+      { detail: { status: 'invalid_api_key', message: 'Invalid API key' } },
+      'ElevenLabs answered 401: Invalid API key',
+    ],
+    [
+      429,
+      { detail: 'Too many concurrent requests' },
+      'ElevenLabs answered 429: Too many concurrent requests',
+    ],
   ])('explains an error %s without the key', async (status, body, message) => {
     const provider = new ElevenLabsVoiceProvider({ apiKey: KEY, fetch: respond(status, body) });
     const error = await provider
@@ -71,9 +82,9 @@ describe('ElevenLabsVoiceProvider', () => {
   it('explains a network failure', async () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
     const provider = new ElevenLabsVoiceProvider({ apiKey: KEY, fetch });
-    await expect(provider.synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' })).rejects.toThrow(
-      'Could not reach ElevenLabs: fetch failed',
-    );
+    await expect(
+      provider.synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' }),
+    ).rejects.toThrow('Could not reach ElevenLabs: fetch failed');
   });
 
   it('refuses an answer without timings', async () => {
@@ -81,8 +92,8 @@ describe('ElevenLabsVoiceProvider', () => {
       apiKey: KEY,
       fetch: respond(200, { audio_base64: okBody.audio_base64 }),
     });
-    await expect(provider.synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' })).rejects.toThrow(
-      'ElevenLabs sent no timing for the voice',
-    );
+    await expect(
+      provider.synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' }),
+    ).rejects.toThrow('ElevenLabs sent no timing for the voice');
   });
 });
