@@ -1,5 +1,6 @@
 import type { PieceCatalog } from './catalog';
 import { type PlanIssue, type Result, zodIssues } from './errors';
+import { isSafeRelativePath } from './primitives';
 import { type Plan, PlanSchema } from './schema';
 
 /**
@@ -64,6 +65,22 @@ export function validatePlan(raw: unknown, catalog: PieceCatalog): Result<Plan> 
       issues.push(...zodIssues(params.error, `${at}.params`));
       return scene;
     }
+    let assetsOk = true;
+    for (const key of piece.assetParams) {
+      const value = params.data[key];
+      if (value === undefined) continue;
+      if (typeof value !== 'string') {
+        issues.push({ path: `${at}.params.${key}`, message: 'must be an asset path' });
+        assetsOk = false;
+      } else if (!isSafeRelativePath(value)) {
+        issues.push({
+          path: `${at}.params.${key}`,
+          message: 'must be a relative path inside the assets folder',
+        });
+        assetsOk = false;
+      }
+    }
+    if (!assetsOk) return scene;
     return { ...scene, params: params.data };
   });
 

@@ -175,3 +175,54 @@ describe('collectAssetPaths', () => {
     ]);
   });
 });
+
+describe('asset params of a piece whose schema is too loose', () => {
+  const looseCatalog = catalogFromSpecs([
+    {
+      id: 'loose',
+      title: 'Loose',
+      description: 'Types its asset param as a plain string',
+      paramsSchema: z.object({ file: z.string() }),
+      assetParams: ['file'],
+      minSeconds: 1,
+      maxSeconds: 6,
+      example: { file: 'a.png' },
+    },
+    {
+      id: 'unknown-file',
+      title: 'Unknown file',
+      description: 'Types its asset param as unknown',
+      paramsSchema: z.object({ file: z.unknown() }),
+      assetParams: ['file'],
+      minSeconds: 1,
+      maxSeconds: 6,
+      example: { file: 'a.png' },
+    },
+  ]);
+
+  function looseIssues(piece: string, params: Record<string, unknown>) {
+    const plan = basePlan();
+    plan.scenes[1] = { id: 'b', piece, params, timing: { kind: 'seconds', seconds: 2 } };
+    const result = validatePlan(plan, looseCatalog);
+    if (result.ok) throw new Error('expected the plan to be refused');
+    return result.issues.filter((issue) => issue.path.startsWith('scenes.1'));
+  }
+
+  it('refuses a path that leaves the assets folder', () => {
+    expect(looseIssues('loose', { file: '../../etc/x.png' })).toEqual([
+      { path: 'scenes.1.params.file', message: 'must be a relative path inside the assets folder' },
+    ]);
+  });
+
+  it('refuses a value that is not a string', () => {
+    expect(looseIssues('unknown-file', { file: 42 })).toEqual([
+      { path: 'scenes.1.params.file', message: 'must be an asset path' },
+    ]);
+  });
+
+  it('refuses a logo outside the assets folder', () => {
+    const plan = basePlan();
+    plan.brand.logo = '../logo.svg';
+    expect(issuesOf(plan).map((issue) => issue.path)).toEqual(['brand.logo']);
+  });
+});
