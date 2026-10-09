@@ -12,4 +12,11 @@ describe('pieceSpecs', () => {
       expect(spec.paramsSchema.safeParse(spec.example).success).toBe(true);
     },
   );
+
+  it.each(pieceSpecs.map((spec) => [spec.id, spec] as const))(
+    '%s refuses a param it does not know',
+    (_, spec) => {
+      expect(spec.paramsSchema.safeParse({ ...spec.example, unknownKey: 1 }).success).toBe(false);
+    },
+  );
 });

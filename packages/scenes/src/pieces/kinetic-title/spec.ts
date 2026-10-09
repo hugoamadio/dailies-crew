@@ -1,7 +1,7 @@
 import type { PieceSpec } from '@dailies-crew/plan';
 import { z } from 'zod';
 
-export const kineticTitleParams = z.object({
+export const kineticTitleParams = z.strictObject({
   lines: z.array(z.string().trim().min(1).max(28)).min(1).max(3),
   align: z.enum(['left', 'center']).default('center'),
   /** Index of the line drawn in the accent color */

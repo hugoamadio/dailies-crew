@@ -1,7 +1,7 @@
 import type { PieceSpec } from '@dailies-crew/plan';
 import { z } from 'zod';
 
-export const ctaEndParams = z.object({
+export const ctaEndParams = z.strictObject({
   cta: z.string().trim().min(1).max(40),
   handle: z.string().trim().min(2).max(40).optional(),
   showLogo: z.boolean().default(true),

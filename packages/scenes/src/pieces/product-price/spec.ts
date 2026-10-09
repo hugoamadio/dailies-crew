@@ -4,7 +4,7 @@ import { z } from 'zod';
 const cents = z.number().int().min(1).max(100_000_000);
 
 export const productPriceParams = z
-  .object({
+  .strictObject({
     image: ImagePath,
     /** In cents: 8990 = R$ 89,90 */
     price: cents,

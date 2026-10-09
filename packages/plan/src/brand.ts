@@ -12,8 +12,8 @@ export const FONT_NAMES = [
 ] as const;
 export type FontName = (typeof FONT_NAMES)[number];
 
-export const BrandSchema = z.object({
-  colors: z.object({
+export const BrandSchema = z.strictObject({
+  colors: z.strictObject({
     background: HexColor,
     surface: HexColor,
     text: HexColor,

@@ -1,7 +1,7 @@
 import type { PieceSpec } from '@dailies-crew/plan';
 import { z } from 'zod';
 
-export const hookBurstParams = z.object({
+export const hookBurstParams = z.strictObject({
   text: z.string().trim().min(1).max(24),
 });
 export type HookBurstParams = z.output<typeof hookBurstParams>;

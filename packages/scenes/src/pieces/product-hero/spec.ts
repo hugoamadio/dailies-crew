@@ -1,7 +1,7 @@
 import { ImagePath, type PieceSpec } from '@dailies-crew/plan';
 import { z } from 'zod';
 
-export const productHeroParams = z.object({
+export const productHeroParams = z.strictObject({
   image: ImagePath,
   name: z.string().trim().min(1).max(40),
   tagline: z.string().trim().min(1).max(60).optional(),

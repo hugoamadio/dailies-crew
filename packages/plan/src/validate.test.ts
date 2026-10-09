@@ -152,6 +152,21 @@ describe('validatePlan', () => {
     },
   );
 
+  it('refuses an unknown or misspelled plan field', () => {
+    expect(issuesOf({ ...basePlan(), musc: {} })).toEqual([
+      { path: '', message: 'Unrecognized key: "musc"' },
+    ]);
+  });
+
+  it('refuses a scene with transition instead of transitionOut', () => {
+    const plan = basePlan();
+    const { transitionOut, ...scene } = plan.scenes[0]!;
+    plan.scenes[0] = { ...scene, transition: transitionOut } as PlanInput['scenes'][number];
+    expect(issuesOf(plan)).toEqual([
+      { path: 'scenes.0', message: 'Unrecognized key: "transition"' },
+    ]);
+  });
+
   it('refuses a short color', () => {
     const plan = basePlan();
     plan.brand.colors.text = '#fff';

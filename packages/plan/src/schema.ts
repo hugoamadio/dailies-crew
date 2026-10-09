@@ -28,19 +28,19 @@ export const CAMERA_MOVES = [
   'rack-focus',
 ] as const;
 
-const TransitionSchema = z.object({
+const TransitionSchema = z.strictObject({
   kind: z.enum(TRANSITION_KINDS),
   seconds: z.number().min(0.2).max(1).default(0.4),
   /** Where the content travels: "left" means the new scene comes in from the right */
   direction: z.enum(DIRECTIONS).default('left'),
 });
 
-const CameraSchema = z.object({
+const CameraSchema = z.strictObject({
   move: z.enum(CAMERA_MOVES).default('static'),
   intensity: z.enum(['subtle', 'medium', 'strong']).default('medium'),
 });
 
-const LightSchema = z.object({
+const LightSchema = z.strictObject({
   /** A band of light that crosses the scene once */
   sweep: z.boolean().default(false),
   /** How dark the corners get, 0 = none */
@@ -48,23 +48,23 @@ const LightSchema = z.object({
 });
 
 const BackgroundSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('solid') }),
-  z.object({ kind: z.literal('gradient'), angle: z.number().min(0).max(360).default(160) }),
-  z.object({
+  z.strictObject({ kind: z.literal('solid') }),
+  z.strictObject({ kind: z.literal('gradient'), angle: z.number().min(0).max(360).default(160) }),
+  z.strictObject({
     kind: z.literal('particles'),
     density: z.enum(['low', 'medium', 'high']).default('medium'),
   }),
-  z.object({ kind: z.literal('grain') }),
+  z.strictObject({ kind: z.literal('grain') }),
 ]);
 
 const TimingSchema = z.discriminatedUnion('kind', [
   /** The scene lasts as long as this voice line (plus a short lead and tail) */
-  z.object({ kind: z.literal('line'), lineId: Slug }),
+  z.strictObject({ kind: z.literal('line'), lineId: Slug }),
   /** A silent scene of fixed length */
-  z.object({ kind: z.literal('seconds'), seconds: z.number().min(0.5).max(15) }),
+  z.strictObject({ kind: z.literal('seconds'), seconds: z.number().min(0.5).max(15) }),
 ]);
 
-const SceneSchema = z.object({
+const SceneSchema = z.strictObject({
   id: Slug,
   piece: Slug,
   /** Checked against the piece's own schema by validatePlan */
@@ -76,27 +76,27 @@ const SceneSchema = z.object({
   transitionOut: TransitionSchema.optional(),
 });
 
-const VoiceSchema = z.object({
+const VoiceSchema = z.strictObject({
   provider: z.enum(['elevenlabs', 'fake']),
   voiceId: z.string().min(1).max(100),
   /** BCP 47, e.g. "pt-BR" */
   language: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/, 'must look like "pt-BR" or "en"'),
-  lines: z.array(z.object({ id: Slug, text: z.string().trim().min(1).max(400) })).min(1).max(20),
+  lines: z.array(z.strictObject({ id: Slug, text: z.string().trim().min(1).max(400) })).min(1).max(20),
 });
 
-const MusicSchema = z.object({
+const MusicSchema = z.strictObject({
   track: AudioPath,
   volume: z.number().min(0).max(1).default(0.22),
   /** Volume while the voice is speaking */
   duckTo: z.number().min(0).max(1).default(0.07),
 });
 
-const CaptionsSchema = z.object({
+const CaptionsSchema = z.strictObject({
   enabled: z.boolean().default(true),
   position: z.enum(['lower', 'center']).default('lower'),
 });
 
-export const PlanSchema = z.object({
+export const PlanSchema = z.strictObject({
   version: z.literal(PLAN_VERSION),
   brand: BrandSchema,
   voice: VoiceSchema,
