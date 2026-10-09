@@ -41,15 +41,12 @@ describe('kinetic title and the layers', () => {
     });
     await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
   });
-  it.each([
-    ['start', 0],
-    ['end', 89],
-  ] as const)('strong pan keeps the title inside the content area at the %s', async (end, frame) => {
-    const file = await expectPieceSnapshot(`camera-pan-left-strong-${end}`, 'kinetic-title', {
-      frame,
+  it.each(['left', 'right'] as const)('strong pans keep the title inside the content area at the end of the move (%s)', async (side) => {
+    const file = await expectPieceSnapshot(`camera-pan-${side}-strong-end`, 'kinetic-title', {
+      frame: 89,
       background: SOLID,
       light: NO_LIGHT,
-      camera: { move: 'pan-left', intensity: 'strong' },
+      camera: { move: side === 'left' ? 'pan-left' : 'pan-right', intensity: 'strong' },
     });
     await expectMarginsEmpty(file, DEMO_BRAND.colors.background);
   });

@@ -19,7 +19,9 @@ function headroom(camera: CameraSpec): number {
       return 1 + 0.12 * a;
     case 'pan-left':
     case 'pan-right':
-      return 1 + 0.08 * a + (2 * 40 * a) / CONTENT_WIDTH;
+      // The translate comes after scale() in the transform, so it is zoomed too (a product, not a sum).
+      // The piece must shrink until its half width plus that shifted distance fits in half the area.
+      return (1 + 0.08 * a) / (1 - ((1 + 0.08 * a) * 40 * a) / (CONTENT_WIDTH / 2));
     case 'handheld':
       return 1.04 + 0.04 * a;
     default:
