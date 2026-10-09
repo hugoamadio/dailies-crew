@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { useBrand } from '../theme/brand';
 import { CAPTION_BAND, FRAME_HEIGHT, SAFE_AREA, SAFE_HEIGHT, SAFE_WIDTH } from '../theme/safe-area';
+import { visiblePage } from './pages';
 
 /** How close words must be to share a caption page */
 const COMBINE_WITHIN_MS = 1000;
@@ -26,9 +27,7 @@ export const Captions: React.FC<{ words: CaptionWord[]; position: 'lower' | 'cen
     [words],
   );
   const nowMs = (frame / fps) * 1000;
-  const page = pages.find(
-    (candidate) => nowMs >= candidate.startMs && nowMs < candidate.startMs + candidate.durationMs,
-  );
+  const page = visiblePage(pages, nowMs);
   const pageText = page
     ? page.tokens
         .map((token) => token.text)
