@@ -1,4 +1,5 @@
 import type React from 'react';
+import { CtaEnd } from './cta-end/Component';
 import { HookBurst } from './hook-burst/Component';
 import { HookQuestion } from './hook-question/Component';
 import { ProductHero } from './product-hero/Component';
@@ -20,4 +21,5 @@ export const pieceComponents: Record<string, PieceComponent> = {
   'product-hero': asPiece(ProductHero),
   'product-price': asPiece(ProductPrice),
   'product-loupe': asPiece(ProductLoupe),
+  'cta-end': asPiece(CtaEnd),
 };

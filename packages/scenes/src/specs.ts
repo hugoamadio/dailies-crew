@@ -1,4 +1,5 @@
 import { catalogFromSpecs, type PieceSpec } from '@dailies-crew/plan';
+import { ctaEndSpec } from './pieces/cta-end/spec';
 import { hookBurstSpec } from './pieces/hook-burst/spec';
 import { hookQuestionSpec } from './pieces/hook-question/spec';
 import { kineticTitleSpec } from './pieces/kinetic-title/spec';
@@ -14,5 +15,6 @@ export const pieceSpecs: readonly PieceSpec[] = [
   productHeroSpec,
   productPriceSpec,
   productLoupeSpec,
+  ctaEndSpec,
 ];
 export const pieceCatalog = catalogFromSpecs(pieceSpecs);
