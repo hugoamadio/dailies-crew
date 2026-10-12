@@ -63,17 +63,24 @@ export async function createRuntime(
   const llm = options.lazyLlm ? lazy(() => createStudioLlm(env)) : createStudioLlm(env);
   const db = createDb(databaseUrl);
   let boss: PgBoss | null = null;
-  if (options.queue) {
-    boss = new PgBoss({
-      connectionString: databaseUrl,
-      application_name: options.worker ? 'dailies-worker' : 'dailies-cli',
-      supervise: options.worker,
-      schedule: options.worker,
-      ...(options.bossSchema ? { schema: options.bossSchema } : {}),
-    });
-    boss.on('error', (error) => log(`[queue] ${error.message}`));
-    await boss.start();
-    await ensureQueues(boss);
+  try {
+    if (options.queue) {
+      boss = new PgBoss({
+        connectionString: databaseUrl,
+        application_name: options.worker ? 'dailies-worker' : 'dailies-cli',
+        supervise: options.worker,
+        schedule: options.worker,
+        ...(options.bossSchema ? { schema: options.bossSchema } : {}),
+      });
+      boss.on('error', (error) => log(`[queue] ${error.message}`));
+      await boss.start();
+      await ensureQueues(boss);
+    }
+  } catch (error) {
+    // close what was opened, or the process hangs on the open connections
+    await boss?.stop({ graceful: false, timeout: 5_000 }).catch(() => undefined);
+    await db.$disconnect().catch(() => undefined);
+    throw error;
   }
   const ctx: StudioContext = {
     db,

@@ -22,7 +22,15 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     console.log(`${signal}: finishing the jobs in progress (up to 60 s)...`);
-    await runtime.close();
+    try {
+      await runtime.close();
+    } catch (error) {
+      console.error(
+        `Could not stop cleanly: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      await runtime.db.$disconnect().catch(() => undefined);
+      process.exit(1);
+    }
     process.exit(0);
   };
   process.once('SIGINT', () => void stop('SIGINT'));

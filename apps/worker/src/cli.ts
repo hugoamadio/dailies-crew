@@ -115,6 +115,17 @@ async function sync(runtime: Runtime, io: CliIo): Promise<void> {
   io.out(`Schedules updated: ${scheduled.length} active lines.`);
 }
 
+/** Like sync, for a command whose change is already saved: a failed sync must not look like a failed save */
+async function syncAfterSave(runtime: Runtime, io: CliIo, saved: string): Promise<void> {
+  try {
+    await sync(runtime, io);
+  } catch (error) {
+    throw new StudioError(
+      `${saved} was saved, but the schedules could not be updated (${error instanceof Error ? error.message : String(error)}); they sync at the next worker start or the next line change`,
+    );
+  }
+}
+
 const VIDEO_STATUSES = [
   'queued',
   'running',
@@ -138,7 +149,7 @@ const COMMANDS: Record<string, CommandSpec> = {
       io.out(
         `Line created: ${line.id} "${line.name}" (${line.kind}, ${line.perDay} per day at ${line.hour}h)`,
       );
-      await sync(runtime, io);
+      await syncAfterSave(runtime, io, `Line ${line.id}`);
     },
   },
   'line:update': {
@@ -150,7 +161,7 @@ const COMMANDS: Record<string, CommandSpec> = {
         logoFile: options.logo ? path.resolve(options.logo) : undefined,
       });
       io.out(`Line updated: ${line.id} "${line.name}"`);
-      await sync(runtime, io);
+      await syncAfterSave(runtime, io, `Line ${line.id}`);
     },
   },
   'line:list': {
