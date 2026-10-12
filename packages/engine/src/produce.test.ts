@@ -38,6 +38,27 @@ describe('produceVideo', () => {
     expect((error as Error).message).toBe(`plan file not found: ${planFile}`);
   });
 
+  it('takes the plan as an object, and wants exactly one of plan and planFile', async () => {
+    const error = await produceVideo({
+      plan: { version: 1 },
+      assetsDir: dir,
+      workDir: path.join(dir, 'work'),
+      voice: new FakeVoiceProvider(),
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(PlanError);
+    await expect(produceVideo({ assetsDir: dir, voice: new FakeVoiceProvider() })).rejects.toThrow(
+      'pass either planFile or plan',
+    );
+    await expect(
+      produceVideo({
+        plan: {},
+        planFile: 'x.json',
+        assetsDir: dir,
+        voice: new FakeVoiceProvider(),
+      }),
+    ).rejects.toThrow('pass either planFile or plan');
+  });
+
   it('explains a plan file that is not JSON', async () => {
     const planFile = path.join(dir, 'plan.json');
     await fs.writeFile(planFile, '{ not json');

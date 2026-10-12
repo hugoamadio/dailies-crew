@@ -11,20 +11,22 @@ import {
 } from '@dailies-crew/plan';
 import { pieceCatalog } from '@dailies-crew/scenes/specs';
 import { EngineError } from './errors';
-import { renderVideo } from './render';
+import { type ReviewFramesOptions, renderVideo } from './render';
 import { stageAssets } from './stage';
 import { synthesizeVoice } from './synthesize';
 import { createVoiceProvider, type VoiceProvider } from './voice';
 
 export { EngineError } from './errors';
-export { renderVideo } from './render';
+export { type RenderResult, type ReviewFramesOptions, renderVideo } from './render';
 export { stageAssets } from './stage';
-export { synthesizeVoice } from './synthesize';
+export { type SynthesisOutcome, synthesizeVoice } from './synthesize';
 
 export type ProduceStage = 'validate' | 'assets' | 'voice' | 'resolve' | 'render' | 'done';
 
 export interface ProduceOptions {
-  planFile: string;
+  /** A direction plan JSON file; or pass the plan itself as `plan` (exactly one of the two) */
+  planFile?: string;
+  plan?: unknown;
   /** Folder the plan's asset paths are relative to */
   assetsDir: string;
   /** Default: <workDir>/video.mp4 */
@@ -39,36 +41,50 @@ export interface ProduceOptions {
   env?: Record<string, string | undefined>;
   onStage?: (stage: ProduceStage, detail?: string) => void;
   onRenderProgress?: (progress: number) => void;
+  /** Also render still frames for the reviewers (into <workDir>/frames) */
+  reviewFrames?: ReviewFramesOptions;
+  /** Aborting it stops the job before the next step, and cancels a render in progress */
+  signal?: AbortSignal;
 }
 
 export interface ProduceResult {
   outFile: string;
   workDir: string;
   durationSeconds: number;
-  /** Billed voice characters, for the cost of the video */
+  /** Voice characters synthesized now, for the cost of the video */
   voiceCharacters: number;
+  /** Voice characters reused from <workDir>/voice-cache.json: already paid */
+  cachedVoiceCharacters: number;
   resolved: ResolvedPlan;
+  /** The review frames in time order; empty without reviewFrames */
+  frameFiles: string[];
 }
 
-/** Direction plan file → MP4: validate, stage the assets, speak the lines, resolve, render */
-export async function produceVideo(options: ProduceOptions): Promise<ProduceResult> {
+async function readPlanFile(planFile: string): Promise<unknown> {
   let text: string;
   try {
-    text = await fs.readFile(options.planFile, 'utf8');
+    text = await fs.readFile(planFile, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new EngineError(`plan file not found: ${options.planFile}`);
+      throw new EngineError(`plan file not found: ${planFile}`);
     }
     throw error;
   }
-  let raw: unknown;
   try {
-    raw = JSON.parse(text);
+    return JSON.parse(text);
   } catch (error) {
     throw new EngineError(
-      `${options.planFile} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      `${planFile} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+/** Direction plan → MP4: validate, stage the assets, speak the lines, resolve, render */
+export async function produceVideo(options: ProduceOptions): Promise<ProduceResult> {
+  if ((options.planFile === undefined) === (options.plan === undefined)) {
+    throw new EngineError('pass either planFile or plan');
+  }
+  const raw = options.planFile !== undefined ? await readPlanFile(options.planFile) : options.plan;
 
   options.onStage?.('validate');
   const validated = validatePlan(raw, pieceCatalog);
@@ -91,8 +107,14 @@ export async function produceVideo(options: ProduceOptions): Promise<ProduceResu
 
   const provider =
     options.voice ?? createVoiceProvider(plan.voice.provider, options.env ?? process.env);
+  options.signal?.throwIfAborted();
   options.onStage?.('voice', provider.name);
-  const { tracks, characters } = await synthesizeVoice(plan, provider, publicDir);
+  const { tracks, characters, cachedCharacters } = await synthesizeVoice(
+    plan,
+    provider,
+    publicDir,
+    { cacheFile: path.join(workDir, 'voice-cache.json') },
+  );
 
   options.onStage?.('resolve');
   const resolved = resolvePlan(plan, tracks, limitsFromCatalog(pieceCatalog));
@@ -100,12 +122,15 @@ export async function produceVideo(options: ProduceOptions): Promise<ProduceResu
 
   const outFile = options.outFile ?? path.join(workDir, 'video.mp4');
   await fs.mkdir(path.dirname(outFile), { recursive: true });
+  options.signal?.throwIfAborted();
   options.onStage?.('render');
-  await renderVideo({
+  const { frameFiles } = await renderVideo({
     resolved: resolved.value,
     publicDir,
     outFile,
     onProgress: options.onRenderProgress,
+    reviewFrames: options.reviewFrames,
+    signal: options.signal,
   });
 
   options.onStage?.('done', outFile);
@@ -114,6 +139,8 @@ export async function produceVideo(options: ProduceOptions): Promise<ProduceResu
     workDir,
     durationSeconds: resolved.value.durationInFrames / resolved.value.fps,
     voiceCharacters: characters,
+    cachedVoiceCharacters: cachedCharacters,
     resolved: resolved.value,
+    frameFiles,
   };
 }

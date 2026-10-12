@@ -35,6 +35,7 @@ describe('ElevenLabsVoiceProvider', () => {
     });
 
     const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
     expect(url).toBe(
       'https://api.elevenlabs.io/v1/text-to-speech/voice%201/with-timestamps?output_format=mp3_44100_128',
     );
@@ -77,6 +78,8 @@ describe('ElevenLabsVoiceProvider', () => {
     expect(error).toBeInstanceOf(VoiceProviderError);
     expect((error as Error).message).toBe(message);
     expect((error as Error).message).not.toContain(KEY);
+    // a refused key will not get better by retrying; a rate limit will
+    expect(error).toMatchObject({ status, retryable: status === 429 });
   });
 
   it('explains a network failure', async () => {
@@ -85,6 +88,9 @@ describe('ElevenLabsVoiceProvider', () => {
     await expect(
       provider.synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' }),
     ).rejects.toThrow('Could not reach ElevenLabs: fetch failed');
+    await expect(
+      provider.synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' }),
+    ).rejects.toMatchObject({ status: null, retryable: true });
   });
 
   it('refuses an answer without timings', async () => {

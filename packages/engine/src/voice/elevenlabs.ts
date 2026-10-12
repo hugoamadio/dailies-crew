@@ -13,6 +13,8 @@ interface Options {
   modelId?: string;
   baseUrl?: string;
   fetch?: typeof fetch;
+  /** A request that takes longer fails as a network error (retryable). Default 120 s */
+  timeoutMs?: number;
 }
 
 interface TimestampsResponse {
@@ -31,12 +33,14 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
   private readonly modelId: string;
   private readonly baseUrl: string;
   private readonly fetch: typeof fetch;
+  private readonly timeoutMs: number;
 
   constructor(options: Options) {
     this.apiKey = options.apiKey;
     this.modelId = options.modelId ?? ELEVENLABS_DEFAULT_MODEL;
     this.baseUrl = (options.baseUrl ?? 'https://api.elevenlabs.io').replace(/\/+$/, '');
     this.fetch = options.fetch ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? 120_000;
   }
 
   async synthesize(request: SynthesisRequest): Promise<SynthesisResult> {
@@ -45,6 +49,7 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
     try {
       response = await this.fetch(url, {
         method: 'POST',
+        signal: AbortSignal.timeout(this.timeoutMs),
         headers: {
           'xi-api-key': this.apiKey,
           'content-type': 'application/json',
@@ -65,6 +70,8 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
     if (!response.ok) {
       throw new VoiceProviderError(
         `ElevenLabs answered ${response.status}: ${await errorDetail(response)}`,
+        response.status,
+        response.status === 429 || response.status >= 500,
       );
     }
     const body = (await response.json()) as TimestampsResponse;

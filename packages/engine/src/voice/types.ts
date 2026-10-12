@@ -26,7 +26,15 @@ export interface VoiceProvider {
 }
 
 export class VoiceProviderError extends Error {
-  constructor(message: string) {
+  /**
+   * @param status the provider's HTTP status; null when no answer came (network) or it was malformed
+   * @param retryable whether trying again can help: false for a refused key or a bad request
+   */
+  constructor(
+    message: string,
+    readonly status: number | null = null,
+    readonly retryable = true,
+  ) {
     super(message);
     this.name = 'VoiceProviderError';
   }

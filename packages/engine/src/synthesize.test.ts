@@ -74,4 +74,64 @@ describe('synthesizeVoice', () => {
     expect((await fs.stat(path.join(publicDir, 'voice/one.wav'))).size).toBeGreaterThan(44);
     await fs.rm(publicDir, { recursive: true, force: true });
   });
+
+  it('pays once per line: a retry reuses the cached lines and synthesizes only the changed one', async () => {
+    const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dailies-cache-'));
+    try {
+      const cacheFile = path.join(jobDir, 'voice-cache.json');
+      const fake = new FakeVoiceProvider();
+      const spoken: string[] = [];
+      const provider: VoiceProvider = {
+        name: 'fake',
+        synthesize: (request) => {
+          spoken.push(request.text);
+          return fake.synthesize(request);
+        },
+      };
+      const plan = (second: string) => {
+        const validated = validatePlan(
+          {
+            version: 1,
+            brand,
+            voice: {
+              provider: 'fake',
+              voiceId: 'v',
+              language: 'pt-BR',
+              lines: [
+                { id: 'one', text: 'Primeira linha' },
+                { id: 'two', text: second },
+              ],
+            },
+            scenes: ['one', 'two'].map((lineId) => ({
+              id: lineId,
+              piece: 'kinetic-title',
+              params: { lines: ['A'] },
+              timing: { kind: 'line', lineId },
+            })),
+          },
+          pieceCatalog,
+        );
+        if (!validated.ok) throw new Error(JSON.stringify(validated.issues));
+        return validated.value;
+      };
+
+      const first = await synthesizeVoice(plan('Segunda linha'), provider, path.join(jobDir, 'a'), {
+        cacheFile,
+      });
+      const again = await synthesizeVoice(plan('Segunda linha'), provider, path.join(jobDir, 'b'), {
+        cacheFile,
+      });
+      const changed = await synthesizeVoice(plan('Outra linha'), provider, path.join(jobDir, 'c'), {
+        cacheFile,
+      });
+
+      expect(spoken).toEqual(['Primeira linha', 'Segunda linha', 'Outra linha']);
+      expect([first.characters, again.characters, changed.characters]).toEqual([27, 0, 11]);
+      expect([again.cachedCharacters, changed.cachedCharacters]).toEqual([27, 14]);
+      expect(again.tracks).toEqual(first.tracks);
+      expect((await fs.stat(path.join(jobDir, 'b/voice/two.wav'))).size).toBeGreaterThan(44);
+    } finally {
+      await fs.rm(jobDir, { recursive: true, force: true });
+    }
+  });
 });

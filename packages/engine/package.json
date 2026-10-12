@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/produce.ts",
+    "./errors": "./src/errors.ts",
     "./voice": "./src/voice/index.ts"
   },
   "dependencies": {
