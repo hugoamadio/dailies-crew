@@ -44,6 +44,31 @@ describe('retryVideo', () => {
   });
 });
 
+describe('guards', () => {
+  it('a double retry queues one job', async () => {
+    const ctx = testContext(db, dataDir);
+    const line = await createLine({ db, dataDir }, topicLineInput());
+    const video = await db.video.create({
+      data: { lineId: line.id, status: 'failed', stage: 'script', failureKind: 'unknown' },
+    });
+    const results = await Promise.allSettled([
+      retryVideo(ctx, video.id),
+      retryVideo(ctx, video.id),
+    ]);
+    expect(results.map((each) => each.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(ctx.queue.jobs).toHaveLength(1);
+  });
+
+  it('resume does not queue a video twice', async () => {
+    const ctx = testContext(db, dataDir);
+    const line = await createLine({ db, dataDir }, topicLineInput());
+    await db.video.create({ data: { lineId: line.id, status: 'paused_budget', stage: 'produce' } });
+    await Promise.all([resumeStudio(ctx), resumeStudio(ctx)]);
+    expect(ctx.queue.jobs).toHaveLength(1);
+    expect(await resumeStudio(ctx)).toEqual({ lines: 0, videos: 0 });
+  });
+});
+
 describe('resumeStudio', () => {
   it('after a refused key: clears the warning, turns the lines back on, queues the waiting videos', async () => {
     const ctx = testContext(db, dataDir);

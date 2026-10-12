@@ -57,6 +57,26 @@ describe('approveVideo', () => {
     });
   });
 
+  it('a double approve records one decision; approving after a redo started throws', async () => {
+    const ctx = testContext(db, dataDir);
+    const video = await readyVideo();
+    const results = await Promise.allSettled([
+      approveVideo(ctx, video.id),
+      approveVideo(ctx, video.id),
+    ]);
+    expect(results.map((each) => each.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(await db.decision.count()).toBe(1);
+
+    const other = await readyVideo();
+    await rejectVideo(ctx, other.id, {
+      reason: 'A voz ficou robótica',
+      mode: 'redo',
+      targetStage: 'script',
+    });
+    await expect(approveVideo(ctx, other.id)).rejects.toThrow('only a video ready for review');
+    expect((await db.video.findUniqueOrThrow({ where: { id: other.id } })).status).toBe('running');
+  });
+
   it('refuses a video still in production', async () => {
     const ctx = testContext(db, dataDir);
     const video = await readyVideo('running');
@@ -154,6 +174,41 @@ describe('rejectVideo', () => {
       mode: 'redo',
     });
     expect(result.stage).toBe('direction');
+  });
+
+  it('two redos at once: one wins, one job, round counted once', async () => {
+    const ctx = testContext(db, dataDir);
+    const video = await readyVideo();
+    const input = { reason: 'Roteiro fraco', mode: 'redo', targetStage: 'script' };
+    const results = await Promise.allSettled([
+      rejectVideo(ctx, video.id, input),
+      rejectVideo(ctx, video.id, input),
+    ]);
+    expect(results.map((each) => each.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(ctx.queue.jobs).toHaveLength(1);
+    expect((await db.video.findUniqueOrThrow({ where: { id: video.id } })).round).toBe(2);
+    expect(await db.decision.count()).toBe(1);
+  });
+
+  it('redo: a voice complaint on a video without a plan keeps its meaning', async () => {
+    const ctx = testContext(db, dataDir);
+    const video = await readyVideo('needs_you');
+    await rejectVideo(ctx, video.id, { reason: 'A voz ficou robótica', mode: 'redo' });
+    expect((await db.video.findUniqueOrThrow({ where: { id: video.id } })).instructions).toEqual([
+      { stage: 'direction', instruction: 'About the voice: A voz ficou robótica', source: 'hugo' },
+    ]);
+  });
+
+  it('learn with a target stage makes no sense', async () => {
+    const ctx = testContext(db, dataDir);
+    const video = await readyVideo();
+    await expect(
+      rejectVideo(ctx, video.id, {
+        reason: 'Música alta demais',
+        mode: 'learn',
+        targetStage: 'script',
+      }),
+    ).rejects.toThrow('only makes sense with "redo"');
   });
 
   it('wants a reason', async () => {

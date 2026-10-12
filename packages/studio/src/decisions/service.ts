@@ -1,4 +1,4 @@
-import type { Video } from '@dailies-crew/db';
+import type { Video, VideoStatus } from '@dailies-crew/db';
 import { z } from 'zod';
 import { clip, type ReworkStage, REWORK_STAGES, recipeOf } from '../crew/context';
 import { buildRouteRequest, type RouterOutput } from '../crew/router';
@@ -12,7 +12,8 @@ import { getSettings } from '../settings/service';
 import { getVideo } from '../videos/service';
 import { manualOutput, type OutputAdapter } from './output';
 
-const DECIDABLE = ['ready_for_review', 'needs_you'];
+const DECIDABLE: VideoStatus[] = ['ready_for_review', 'needs_you'];
+const NO_LONGER_WAITING = 'The video is no longer waiting for a decision';
 
 export const RejectInputSchema = z.strictObject({
   reason: z.string().trim().min(3).max(1000),
@@ -49,20 +50,21 @@ export async function approveVideo(
   if (!video.videoFile) {
     throw new StudioError(`Video ${videoId} has no rendered file; reject it with "redo" instead`);
   }
-  const publication = await output.publish(video);
   const now = ctx.now();
-  const [approved] = await ctx.db.$transaction([
-    ctx.db.video.update({
+  return ctx.db.$transaction(async (tx) => {
+    // the guarded change comes first: a lost race never publishes
+    const claimed = await tx.video.updateMany({
+      where: { id: videoId, status: { in: DECIDABLE } },
+      data: { status: 'approved', decidedAt: now },
+    });
+    if (claimed.count === 0) throw new StudioError(NO_LONGER_WAITING);
+    const publication = await output.publish(video);
+    await tx.decision.create({ data: { videoId, kind: 'approve' } });
+    return tx.video.update({
       where: { id: videoId },
-      data: {
-        status: 'approved',
-        decidedAt: now,
-        publication: json({ adapter: output.name, ...publication, at: now.toISOString() }),
-      },
-    }),
-    ctx.db.decision.create({ data: { videoId, kind: 'approve' } }),
-  ]);
-  return approved;
+      data: { publication: json({ adapter: output.name, ...publication, at: now.toISOString() }) },
+    });
+  });
 }
 
 /** The rejection router: the stage that can fix the complaint, and the complaint as a rule */
@@ -110,6 +112,11 @@ export async function rejectVideo(
   const video = await getVideo(ctx.db, videoId);
   ensureDecidable(video);
   const now = ctx.now();
+  if (mode === 'learn' && targetStage) {
+    throw new StudioError(
+      'A target stage only makes sense with "redo"; "learn" does not rerun anything',
+    );
+  }
 
   if (mode === 'learn') {
     let rule: string;
@@ -119,17 +126,23 @@ export async function rejectVideo(
       ctx.log(`[reject] the router failed, the reason becomes the rule as is: ${String(error)}`);
       rule = clip(reason, 200);
     }
-    const [rejected] = await ctx.db.$transaction([
-      ctx.db.video.update({ where: { id: videoId }, data: { status: 'rejected', decidedAt: now } }),
-      ctx.db.learnedRule.create({
+    const rejected = await ctx.db.$transaction(async (tx) => {
+      const claimed = await tx.video.updateMany({
+        where: { id: videoId, status: { in: DECIDABLE } },
+        data: { status: 'rejected', decidedAt: now },
+      });
+      if (claimed.count === 0) throw new StudioError(NO_LONGER_WAITING);
+      await tx.learnedRule.create({
         data: { lineId: video.lineId, text: rule, sourceVideoId: videoId },
-      }),
-      ctx.db.decision.create({ data: { videoId, kind: 'reject', reason, mode } }),
-    ]);
+      });
+      await tx.decision.create({ data: { videoId, kind: 'reject', reason, mode } });
+      return tx.video.findUniqueOrThrow({ where: { id: videoId } });
+    });
     return { video: rejected, stage: null, rule };
   }
 
   let stage: ReworkStage;
+  let instruction = reason;
   if (targetStage) {
     if (!canRedo(video, targetStage)) {
       throw new StudioError(
@@ -139,30 +152,42 @@ export async function rejectVideo(
     stage = targetStage;
   } else {
     // the router's pick, or the latest earlier stage the video already went through
-    const picked = REWORK_STAGES.indexOf((await route(ctx, video, reason)).stage);
-    stage = REWORK_STAGES.slice(0, picked + 1).findLast((each) => canRedo(video, each)) ?? 'script';
+    const pick = (await route(ctx, video, reason)).stage;
+    const fallback = REWORK_STAGES.slice(0, REWORK_STAGES.indexOf(pick) + 1).findLast((each) =>
+      canRedo(video, each),
+    );
+    if (!fallback) {
+      throw new StudioError(`Video ${videoId} has not reached any stage that can be redone`);
+    }
+    stage = fallback;
+    // the complaint was about a later stage: say so, so the earlier one still sees it
+    if (stage !== pick) {
+      instruction = `About ${pick === 'produce' ? 'the voice' : `the ${pick}`}: ${reason}`;
+    }
   }
+  // before the video runs again, so the produce worker cannot reuse the old voice
+  if (stage === 'produce') await forgetVoice(ctx.dataDir, videoId);
   const redone = await ctx.db.$transaction(async (tx) => {
-    await tx.decision.create({
-      data: { videoId, kind: 'reject', reason, mode, targetStage: stage },
-    });
-    const updated = await tx.video.update({
-      where: { id: videoId },
+    const claimed = await tx.video.updateMany({
+      where: { id: videoId, status: { in: DECIDABLE } },
       data: {
         status: 'running',
         stage,
         round: { increment: 1 },
         reviewRounds: 0,
-        instructions: json([{ stage, instruction: reason, source: 'hugo' }]),
+        instructions: json([{ stage, instruction, source: 'hugo' }]),
         problems: [],
         readyAt: null,
         failureKind: null,
         failureReason: null,
       },
     });
+    if (claimed.count === 0) throw new StudioError(NO_LONGER_WAITING);
+    await tx.decision.create({
+      data: { videoId, kind: 'reject', reason, mode, targetStage: stage },
+    });
     await ctx.queue.enqueue(stage, videoId, tx);
-    return updated;
+    return tx.video.findUniqueOrThrow({ where: { id: videoId } });
   });
-  if (stage === 'produce') await forgetVoice(ctx.dataDir, videoId);
   return { video: redone, stage, rule: null };
 }

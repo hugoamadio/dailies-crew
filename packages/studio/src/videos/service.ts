@@ -6,7 +6,7 @@ import { spendBetween } from '../costs/service';
 import { StudioError } from '../errors';
 import type { StudioContext } from '../pipeline/context';
 import { RESUMABLE_FAILURES } from '../pipeline/failure';
-import { clearGlobalWarning, getSettings } from '../settings/service';
+import { getSettings } from '../settings/service';
 
 export async function getVideo(db: Db, id: string): Promise<Video> {
   const video = isUuid(id) ? await db.video.findUnique({ where: { id } }) : null;
@@ -52,12 +52,13 @@ export async function retryVideo(ctx: StudioContext, id: string): Promise<Video>
     throw new StudioError(`Video ${id} is ${video.status}; only a failed video can be tried again`);
   }
   return ctx.db.$transaction(async (tx) => {
-    const updated = await tx.video.update({
-      where: { id },
+    const claimed = await tx.video.updateMany({
+      where: { id, status: 'failed' },
       data: { status: 'queued', failureKind: null, failureReason: null },
     });
+    if (claimed.count === 0) throw new StudioError(`Video ${id} is no longer failed`);
     await ctx.queue.enqueue(video.stage, id, tx);
-    return updated;
+    return tx.video.findUniqueOrThrow({ where: { id } });
   });
 }
 
@@ -76,35 +77,47 @@ export async function resumeStudio(
       `Everything is stopped: ${settings.warning}. Fix it, then run "crew resume" without --line`,
     );
   }
-  if (!options.lineId) await clearGlobalWarning(ctx.db);
   const ofLine = options.lineId ? { lineId: options.lineId } : {};
-  const lines = await ctx.db.productionLine.updateMany({
-    where: {
-      ...(options.lineId ? { id: options.lineId } : {}),
-      active: false,
-      pausedReason: { not: null },
-    },
-    data: { active: true, pausedReason: null },
-  });
-  const waiting = await ctx.db.video.findMany({
-    where: {
-      ...ofLine,
-      OR: [
-        { status: 'paused_budget' },
-        { status: 'failed', failureKind: { in: RESUMABLE_FAILURES } },
-      ],
-    },
-  });
-  await ctx.db.$transaction(async (tx) => {
+  const { lines, videos } = await ctx.db.$transaction(async (tx) => {
+    if (!options.lineId)
+      await tx.settings.update({ where: { id: 1 }, data: { warning: null, warningAt: null } });
+    const lines = await tx.productionLine.updateMany({
+      where: {
+        ...(options.lineId ? { id: options.lineId } : {}),
+        active: false,
+        pausedReason: { not: null },
+      },
+      data: { active: true, pausedReason: null, warning: null },
+    });
+    const waiting = await tx.video.findMany({
+      where: {
+        ...ofLine,
+        OR: [
+          { status: 'paused_budget' },
+          { status: 'failed', failureKind: { in: RESUMABLE_FAILURES } },
+        ],
+      },
+    });
+    let videos = 0;
     for (const video of waiting) {
-      await tx.video.update({
-        where: { id: video.id },
+      // guarded: a video someone else already moved is not queued twice
+      const claimed = await tx.video.updateMany({
+        where: {
+          id: video.id,
+          OR: [
+            { status: 'paused_budget' },
+            { status: 'failed', failureKind: { in: RESUMABLE_FAILURES } },
+          ],
+        },
         data: { status: 'queued', failureKind: null, failureReason: null },
       });
+      if (claimed.count === 0) continue;
       await ctx.queue.enqueue(video.stage, video.id, tx);
+      videos += 1;
     }
+    return { lines: lines.count, videos };
   });
-  return { lines: lines.count, videos: waiting.length };
+  return { lines, videos };
 }
 
 /** The panel's "Hoje" in numbers: what is happening and what it costs this month */
@@ -153,11 +166,11 @@ export async function costsReport(db: Db, now: Date, yearMonth?: string) {
     month: label,
     totalUsd: roundUsd(total),
     videos,
-    perVideoUsd: videos ? Math.round((total / videos) * 10_000) / 10_000 : 0,
+    perVideoUsd: videos ? roundUsd(total / videos) : 0,
     lines: byLine.map((group) => ({
       line: nameOf.get(group.lineId) ?? group.lineId,
-      usd: group._sum.usd ?? 0,
+      usd: roundUsd(group._sum.usd ?? 0),
     })),
-    roles: byRole.map((group) => ({ role: group.role, usd: group._sum.usd ?? 0 })),
+    roles: byRole.map((group) => ({ role: group.role, usd: roundUsd(group._sum.usd ?? 0) })),
   };
 }
