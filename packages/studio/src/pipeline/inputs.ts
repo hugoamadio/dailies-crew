@@ -1,5 +1,6 @@
 import type { Db, Stage, Video } from '@dailies-crew/db';
 import { type Plan, PlanSchema } from '@dailies-crew/plan';
+import { parseInput, StudioError } from '../errors';
 import type { Instruction } from '../crew/context';
 import { type IdeaDraft, IdeaSchema } from '../crew/creator';
 import { type Briefing, BriefingSchema } from '../crew/preparer';
@@ -7,21 +8,29 @@ import { type Script, ScriptSchema } from '../crew/scriptwriter';
 
 function need<T>(value: T | null | undefined, what: string, video: Video): T {
   if (value === null || value === undefined) {
-    throw new Error(`Video ${video.id} has no ${what} yet (stage ${video.stage})`);
+    throw new StudioError(`Video ${video.id} has no ${what} yet (stage ${video.stage})`);
   }
   return value;
 }
 
 export function briefingOf(video: Video): Briefing {
-  return BriefingSchema.parse(need(video.briefing, 'briefing', video));
+  return parseInput(
+    BriefingSchema,
+    need(video.briefing, 'briefing', video),
+    `briefing of video ${video.id}`,
+  );
 }
 
 export function scriptOf(video: Video): Script {
-  return ScriptSchema.parse(need(video.script, 'script', video));
+  return parseInput(
+    ScriptSchema,
+    need(video.script, 'script', video),
+    `script of video ${video.id}`,
+  );
 }
 
 export function planOf(video: Video): Plan {
-  return PlanSchema.parse(need(video.plan, 'plan', video));
+  return parseInput(PlanSchema, need(video.plan, 'plan', video), `plan of video ${video.id}`);
 }
 
 /** The change requests of the current round for one stage */
@@ -37,7 +46,11 @@ export async function chosenIdeaOf(db: Db, video: Video): Promise<IdeaDraft> {
     where: { videoId: video.id, status: { in: ['chosen', 'used'] } },
   });
   const { title, hook, angle, structure, cta } = need(idea, 'chosen idea', video);
-  return IdeaSchema.parse({ title, hook, angle, structure, cta });
+  return parseInput(
+    IdeaSchema,
+    { title, hook, angle, structure, cta },
+    `chosen idea of video ${video.id}`,
+  );
 }
 
 /** What the last finished run of a stage produced, in any round */

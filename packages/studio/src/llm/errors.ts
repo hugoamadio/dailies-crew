@@ -1,3 +1,4 @@
+import type { TokenUsage } from '../costs/math';
 import type { RoleName } from '../roles';
 
 export type LlmErrorKind =
@@ -16,6 +17,11 @@ export type LlmErrorKind =
  * "auth" and "credit" stop every line instead (spec section 9). Messages never carry the key.
  */
 export class LlmError extends Error {
+  /** Set when the error came after a full (billed) answer: the model that answered */
+  model?: string;
+  /** Set together with `model`: the tokens that answer used, so the cost can still be recorded */
+  usage?: TokenUsage;
+
   constructor(
     readonly kind: LlmErrorKind,
     message: string,

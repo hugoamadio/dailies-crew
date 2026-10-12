@@ -213,6 +213,27 @@ describe('AnthropicLlm', () => {
     await expect(llm.generate(request('claude-opus-5-5'))).rejects.toThrow('no text');
   });
 
+  it('carries the model and usage on errors raised after an answer arrived (it was billed)', async () => {
+    const usage = {
+      inputTokens: 1200,
+      outputTokens: 300,
+      cacheReadTokens: 100,
+      cacheWriteTokens: 0,
+    };
+    beta.mockResolvedValueOnce(message('{"ti', { stop_reason: 'max_tokens' }));
+    await expect(llm.generate(request('claude-opus-5-5'))).rejects.toMatchObject({
+      kind: 'truncated',
+      model: 'claude-sonnet-5-5',
+      usage,
+    });
+    beta.mockResolvedValueOnce(message('{"title":"x"}'));
+    await expect(llm.generate(request('claude-opus-5-5'))).rejects.toMatchObject({
+      kind: 'invalid_output',
+      model: 'claude-sonnet-5-5',
+      usage,
+    });
+  });
+
   it('treats a full context window like a cut answer', async () => {
     beta.mockResolvedValue(message('{"ti', { stop_reason: 'model_context_window_exceeded' }));
     await expect(llm.generate(request('claude-opus-5-5'))).rejects.toThrow(LlmTruncatedError);

@@ -5,9 +5,12 @@ import { resetDb, testDb } from '@dailies-crew/db/test';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tempDataDir, topicLineInput } from '../../test/fixtures';
 import { testContext } from '../../test/studio';
+import type { Instruction } from '../crew/context';
 import { buildPrepareRequest } from '../crew/preparer';
+import { createFakeLlm } from '../crew/fake';
 import { createLine } from '../lines/service';
 import { LlmError } from '../llm/errors';
+import type { LlmClient } from '../llm/types';
 import { getSettings } from '../settings/service';
 import type { StageHandler, StageResult } from './handler';
 import { json } from './json';
@@ -269,7 +272,7 @@ describe('runStage', () => {
 
   it('forgets the voice when a rework from an earlier stage also asks for a new take', async () => {
     const ctx = testContext(db, dataDir);
-    async function reworkFromScript(items: { stage: string; instruction: string }[]) {
+    async function reworkFromScript(items: Omit<Instruction, 'source'>[]) {
       const video = await topicVideo({ stage: 'review', status: 'running' });
       const voiceCache = path.join(dataDir, 'jobs', video.id, 'voice-cache.json');
       await fs.mkdir(path.join(path.dirname(voiceCache), 'voice-cache'), { recursive: true });
@@ -278,7 +281,7 @@ describe('runStage', () => {
         outcome: {
           kind: 'rework',
           from: 'script',
-          instructions: items.map((item) => ({ ...item, source: 'review' })) as never,
+          instructions: items.map((item) => ({ ...item, source: 'review' as const })),
         },
         output: {},
       });
@@ -300,6 +303,113 @@ describe('runStage', () => {
     const kept = await reworkFromScript([{ stage: 'script', instruction: 'The hook is weak' }]);
     await expect(fs.access(kept.voiceCache)).resolves.toBeUndefined();
     await expect(fs.access(kept.folder)).resolves.toBeUndefined();
+  });
+
+  it('adds up the cost of calls that run in parallel', async () => {
+    const inner = createFakeLlm() as LlmClient;
+    const llm: LlmClient = {
+      name: 'fake',
+      generate: async (request) => {
+        const result = await inner.generate(request);
+        const usage = {
+          inputTokens: 1000,
+          outputTokens: 500,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        };
+        return { ...result, usage };
+      },
+    };
+    const ctx = testContext(db, dataDir, { llm });
+    const video = await topicVideo();
+    const parallel: StageHandler = async (_ctx, run) => {
+      const ask = () =>
+        run.call(
+          buildPrepareRequest(
+            {
+              recipe: run.recipe,
+              rules: run.rules,
+              material: run.material,
+              recentIdeas: [],
+              rejections: [],
+            },
+            run.settings.roles.preparer,
+          ),
+        );
+      await Promise.all([ask(), ask(), ask()]);
+      return { outcome: { kind: 'next' }, output: {} };
+    };
+    await runStage(ctx, 'prepare', job(video.id), handlers({ prepare: parallel }));
+    const entries = await db.costEntry.findMany();
+    expect(entries).toHaveLength(3);
+    const total = entries.reduce((sum, entry) => sum + entry.usd, 0);
+    expect(total).toBeGreaterThan(0);
+    expect((await db.stageRun.findFirstOrThrow()).costUsd).toBeCloseTo(total, 6);
+  });
+
+  it('records the cost of a Claude answer that was billed and then failed', async () => {
+    const billed = new LlmError('truncated', 'The preparer answer was cut', true);
+    billed.model = 'claude-haiku-5-5';
+    billed.usage = {
+      inputTokens: 1000,
+      outputTokens: 500,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    };
+    const llm: LlmClient = {
+      name: 'fake',
+      generate: async () => {
+        throw billed;
+      },
+    };
+    const ctx = testContext(db, dataDir, { llm });
+    const video = await topicVideo();
+    await runStage(ctx, 'prepare', job(video.id, true), handlers({ prepare }));
+    expect(await db.costEntry.findFirstOrThrow()).toMatchObject({
+      role: 'preparer',
+      model: 'claude-haiku-5-5',
+      inputTokens: 1000,
+    });
+    const run = await db.stageRun.findFirstOrThrow();
+    expect(run.status).toBe('failed');
+    expect(run.costUsd).toBeGreaterThan(0);
+  });
+
+  it('drops the result of an attempt that was taken over while it was still running', async () => {
+    const ctx = testContext(db, dataDir);
+    const video = await topicVideo();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let persisted = 0;
+    const slow: StageHandler = async () => {
+      await gate;
+      return {
+        outcome: { kind: 'next' },
+        output: { who: 'slow' },
+        persist: async () => {
+          persisted += 1;
+        },
+      };
+    };
+    const first = runStage(ctx, 'prepare', job(video.id), handlers({ prepare: slow }));
+    while ((await db.stageRun.count()) === 0) await new Promise((r) => setTimeout(r, 10));
+
+    // the queue delivers the job again while the first attempt is alive
+    await runStage(ctx, 'prepare', job(video.id), handlers());
+    release();
+    await first;
+
+    expect(persisted).toBe(0);
+    const runs = await db.stageRun.findMany({ orderBy: { attempt: 'asc' } });
+    expect(runs.map((run) => [run.attempt, run.status])).toEqual([
+      [1, 'failed'],
+      [2, 'done'],
+    ]);
+    expect(runs[0]?.error).toBe('interrupted: the worker stopped');
+    expect(ctx.queue.jobs).toEqual([{ stage: 'ideas', videoId: video.id }]);
+    expect(ctx.logs.some((line) => line.includes('superseded'))).toBe(true);
   });
 
   it('makes the video ready for review after the last stage, or hands it to Hugo with the problems', async () => {

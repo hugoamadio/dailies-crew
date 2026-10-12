@@ -20,6 +20,7 @@ import type {
 import type { MessageStreamParams } from '@anthropic-ai/sdk/resources/messages/messages';
 import type { z } from 'zod';
 import type { RoleName } from '../roles';
+import type { TokenUsage } from '../costs/math';
 import { LlmError, LlmInvalidOutputError, LlmRefusalError, LlmTruncatedError } from './errors';
 import { parseJsonAnswer } from './parse';
 import type { LlmClient, LlmContent, LlmRequest, LlmResult } from './types';
@@ -138,27 +139,38 @@ export class AnthropicLlm implements LlmClient {
     } catch (error) {
       throw classifyError(request.role, error);
     }
-    if (message.stop_reason === 'refusal') {
-      throw new LlmRefusalError(request.role, message.stop_details?.category ?? null);
-    }
-    if (
-      message.stop_reason === 'max_tokens' ||
-      message.stop_reason === 'model_context_window_exceeded'
-    ) {
-      throw new LlmTruncatedError(request.role, request.maxTokens);
-    }
-    // A mid-stream fallback leaves the refused model's partial text and continues in a second block
-    const texts = message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []));
-    if (texts.length === 0) throw new LlmInvalidOutputError(request.role, ['- (answer): no text']);
-    return {
-      data: parseJsonAnswer(request.role, request.schema, texts.join('')),
-      model: message.model,
-      usage: {
-        inputTokens: message.usage.input_tokens,
-        outputTokens: message.usage.output_tokens,
-        cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
-        cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
-      },
+    const usage: TokenUsage = {
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+      cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
     };
+    try {
+      if (message.stop_reason === 'refusal') {
+        throw new LlmRefusalError(request.role, message.stop_details?.category ?? null);
+      }
+      if (
+        message.stop_reason === 'max_tokens' ||
+        message.stop_reason === 'model_context_window_exceeded'
+      ) {
+        throw new LlmTruncatedError(request.role, request.maxTokens);
+      }
+      // A mid-stream fallback leaves the refused model's partial text and continues in a second block
+      const texts = message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []));
+      if (texts.length === 0)
+        throw new LlmInvalidOutputError(request.role, ['- (answer): no text']);
+      return {
+        data: parseJsonAnswer(request.role, request.schema, texts.join('')),
+        model: message.model,
+        usage,
+      };
+    } catch (error) {
+      // the answer arrived and was billed: the error carries what it cost
+      if (error instanceof LlmError) {
+        error.model = message.model;
+        error.usage = usage;
+      }
+      throw error;
+    }
   }
 }

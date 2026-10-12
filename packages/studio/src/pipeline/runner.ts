@@ -1,7 +1,8 @@
 import type { Stage } from '@dailies-crew/db';
 import type { VoiceProvider } from '@dailies-crew/engine/voice';
 import { materialOf, recipeOf } from '../crew/context';
-import { roundUsd } from '../costs/math';
+import { LlmError } from '../llm/errors';
+import { roundUsd, type TokenUsage } from '../costs/math';
 import { checkBudget, recordLlmCost, recordVoiceCost } from '../costs/service';
 import { getLine, pauseLine } from '../lines/service';
 import { getSettings, setGlobalWarning } from '../settings/service';
@@ -26,6 +27,7 @@ export function meteredVoice(
 ): VoiceProvider {
   return {
     name: provider.name,
+    cacheKey: provider.cacheKey,
     synthesize: async (request) => {
       const result = await provider.synthesize(request);
       await onCharacters(result.characters);
@@ -53,8 +55,8 @@ async function fail(
   cost: number,
 ): Promise<void> {
   const failure = classifyFailure(error);
-  await ctx.db.stageRun.update({
-    where: { id: runId },
+  const marked = await ctx.db.stageRun.updateMany({
+    where: { id: runId, status: 'running' },
     data: {
       status: 'failed',
       error: failure.message,
@@ -62,6 +64,12 @@ async function fail(
       finishedAt: ctx.now(),
     },
   });
+  if (marked.count === 0) {
+    // another attempt took over this stage: it decides what happens to the video
+    if (failure.stopsEverything) await stopEverything(ctx, failure.message);
+    ctx.log(`[${stage}] ${videoId}: superseded attempt failed, ignored: ${failure.message}`);
+    return;
+  }
   const failed = {
     status: 'failed' as const,
     failureKind: failure.kind,
@@ -116,6 +124,7 @@ export async function runStage(
 
   const settings = await getSettings(ctx.db);
   if (settings.warning) {
+    ctx.log(`[${stage}] ${video.id}: waiting, global warning: ${settings.warning}`);
     await ctx.db.video.update({
       where: { id: video.id },
       data: { status: 'failed', failureKind: 'paused', failureReason: settings.warning },
@@ -171,34 +180,63 @@ export async function runStage(
       rules: rules.map((rule) => rule.text),
       signal: job.signal,
       call: async (request) => {
-        const result = await ctx.llm.generate(request);
-        cost += await recordLlmCost(ctx.db, settings, {
-          lineId: line.id,
-          videoId: video.id,
-          stage,
-          role: request.role,
-          requestedModel: request.model,
-          model: result.model,
-          usage: result.usage,
-        });
+        const record = async (model: string, usage: TokenUsage) => {
+          // read `cost` only after the await: calls running in parallel must not lose each other's sums
+          const usd = await recordLlmCost(ctx.db, settings, {
+            lineId: line.id,
+            videoId: video.id,
+            stage,
+            role: request.role,
+            requestedModel: request.model,
+            model,
+            usage,
+          });
+          cost += usd;
+        };
+        let result;
+        try {
+          result = await ctx.llm.generate(request);
+        } catch (error) {
+          // an answer that was billed and then refused, cut or invalid still counts against the caps
+          if (error instanceof LlmError && error.usage) {
+            await record(error.model ?? request.model, error.usage);
+          }
+          throw error;
+        }
+        await record(result.model, result.usage);
         return result.data;
       },
       voice: () =>
         meteredVoice(ctx.voices(line.voice.provider), async (characters) => {
-          cost += await recordVoiceCost(ctx.db, settings, {
+          const usd = await recordVoiceCost(ctx.db, settings, {
             lineId: line.id,
             videoId: video.id,
             provider: line.voice.provider,
             characters,
           });
+          cost += usd;
         }),
     };
     const result = await handlers[stage](ctx, runContext);
     outcome = result.outcome;
-    await ctx.db.$transaction(async (tx) => {
-      await result.persist?.(tx);
-      await tx.stageRun.update({
-        where: { id: run.id },
+    const saved = await ctx.db.$transaction(async (tx) => {
+      // lock the video: a second attempt of the same stage waits here, then sees the first one's result
+      await tx.$queryRaw`SELECT id FROM videos WHERE id = ${video.id}::uuid FOR UPDATE`;
+      const current = await tx.video.findUnique({ where: { id: video.id } });
+      const finished = await tx.stageRun.count({
+        where: { videoId: video.id, stage, round: video.round, status: 'done' },
+      });
+      if (
+        !current ||
+        current.stage !== stage ||
+        current.round !== video.round ||
+        (current.status !== 'queued' && current.status !== 'running') ||
+        finished > 0
+      ) {
+        return false;
+      }
+      const marked = await tx.stageRun.updateMany({
+        where: { id: run.id, status: 'running' },
         data: {
           status: 'done',
           ...(result.input !== undefined ? { input: json(result.input) } : {}),
@@ -207,7 +245,14 @@ export async function runStage(
           finishedAt: ctx.now(),
         },
       });
+      if (marked.count === 0) return false;
+      await result.persist?.(tx);
+      return true;
     });
+    if (!saved) {
+      ctx.log(`[${stage}] ${video.id}: attempt ${attempt} superseded, its result is dropped`);
+      return;
+    }
   } catch (error) {
     await fail(ctx, stage, video.id, run.id, error, job, cost);
     return;
