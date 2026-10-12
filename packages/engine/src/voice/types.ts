@@ -22,6 +22,11 @@ export interface SynthesisResult {
 
 export interface VoiceProvider {
   readonly name: 'elevenlabs' | 'fake';
+  /**
+   * Settings that change how a line sounds (e.g. the model); part of the voice cache key, so a
+   * different setting never reuses audio made with another one
+   */
+  readonly cacheKey?: string;
   synthesize(request: SynthesisRequest): Promise<SynthesisResult>;
 }
 

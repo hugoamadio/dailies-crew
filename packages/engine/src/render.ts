@@ -54,8 +54,17 @@ export async function renderVideo({
   const outDir = path.join(jobDir, 'bundle');
   const { cancelSignal, cancel } = makeCancelSignal();
   signal?.addEventListener('abort', cancel, { once: true });
+  const framesDir = path.join(jobDir, 'frames');
+  const partialFile = path.join(
+    path.dirname(outFile),
+    `${path.basename(outFile, path.extname(outFile))}.partial${path.extname(outFile)}`,
+  );
+  let completed = false;
   try {
     signal?.throwIfAborted();
+    // a video left by an earlier run must never pass for this one
+    await fs.rm(outFile, { force: true });
+    await fs.rm(partialFile, { force: true });
     const serveUrl = await bundle({
       entryPoint: SCENES_ENTRY,
       publicDir,
@@ -69,13 +78,16 @@ export async function renderVideo({
       serveUrl,
       codec: 'h264',
       crf: 18,
-      outputLocation: outFile,
+      outputLocation: partialFile,
       inputProps,
       cancelSignal,
       onProgress: ({ progress }) => onProgress?.(progress),
     });
-    if (!reviewFrames) return { frameFiles: [] };
-    const framesDir = path.join(jobDir, 'frames');
+    await fs.rename(partialFile, outFile);
+    if (!reviewFrames) {
+      completed = true;
+      return { frameFiles: [] };
+    }
     await fs.rm(framesDir, { recursive: true, force: true });
     await renderFrames({
       composition,
@@ -90,9 +102,15 @@ export async function renderVideo({
       onFrameUpdate: () => undefined,
     });
     const names = (await fs.readdir(framesDir)).filter((name) => name.endsWith('.jpeg')).sort();
+    completed = true;
     return { frameFiles: names.map((name) => path.join(framesDir, name)) };
   } finally {
     signal?.removeEventListener('abort', cancel);
     await fs.rm(outDir, { recursive: true, force: true });
+    await fs.rm(partialFile, { force: true });
+    if (!completed) {
+      await fs.rm(outFile, { force: true });
+      await fs.rm(framesDir, { recursive: true, force: true });
+    }
   }
 }

@@ -38,6 +38,10 @@ afterEach(async () => {
   await fs.rm(workDir, { recursive: true, force: true });
 });
 
+const writeVideo = async ({ outputLocation }: { outputLocation: string }) => {
+  await fs.writeFile(outputLocation, 'video');
+};
+
 const options = () => ({
   resolved: {} as ResolvedPlan,
   publicDir: path.join(workDir, 'public'),
@@ -46,7 +50,7 @@ const options = () => ({
 
 describe('renderVideo', () => {
   it('bundles into <workDir>/bundle and deletes it after the render', async () => {
-    remotion.renderMedia.mockResolvedValue(undefined);
+    remotion.renderMedia.mockImplementation(writeVideo);
     const result = await renderVideo(options());
     expect(remotion.bundle).toHaveBeenCalledWith(
       expect.objectContaining({ outDir: path.join(workDir, 'bundle') }),
@@ -54,6 +58,8 @@ describe('renderVideo', () => {
     expect(existsSync(path.join(workDir, 'bundle'))).toBe(false);
     expect(existsSync(path.join(workDir, 'public'))).toBe(true);
     expect(result).toEqual({ frameFiles: [] });
+    expect(await fs.readFile(path.join(workDir, 'video.mp4'), 'utf8')).toBe('video');
+    expect(existsSync(path.join(workDir, 'video.partial.mp4'))).toBe(false);
     expect(remotion.renderFrames).not.toHaveBeenCalled();
   });
 
@@ -63,8 +69,23 @@ describe('renderVideo', () => {
     expect(existsSync(path.join(workDir, 'bundle'))).toBe(false);
   });
 
+  it('leaves no video behind when the render fails or is cancelled, and drops a stale one', async () => {
+    await fs.writeFile(path.join(workDir, 'video.mp4'), 'stale');
+    await fs.mkdir(path.join(workDir, 'frames'));
+    remotion.renderMedia.mockImplementation(async (args: { outputLocation: string }) => {
+      await fs.writeFile(args.outputLocation, 'half');
+      throw new Error('renderMedia() got cancelled');
+    });
+    await expect(
+      renderVideo({ ...options(), reviewFrames: { everyNthFrame: 15, scale: 1 } }),
+    ).rejects.toThrow();
+    expect(existsSync(path.join(workDir, 'video.mp4'))).toBe(false);
+    expect(existsSync(path.join(workDir, 'video.partial.mp4'))).toBe(false);
+    expect(existsSync(path.join(workDir, 'frames'))).toBe(false);
+  });
+
   it('renders the review frames from the same bundle, before deleting it', async () => {
-    remotion.renderMedia.mockResolvedValue(undefined);
+    remotion.renderMedia.mockImplementation(writeVideo);
     remotion.renderFrames.mockImplementation(async ({ outputDir }: { outputDir: string }) => {
       expect(existsSync(path.join(workDir, 'bundle', 'bundle.js'))).toBe(true);
       await fs.mkdir(outputDir, { recursive: true });

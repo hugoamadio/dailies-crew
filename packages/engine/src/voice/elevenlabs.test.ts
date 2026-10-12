@@ -93,6 +93,23 @@ describe('ElevenLabsVoiceProvider', () => {
     ).rejects.toMatchObject({ status: null, retryable: true });
   });
 
+  it('classifies an unreadable answer body as retryable, without a status', async () => {
+    const broken = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.reject(new Error('The operation was aborted due to timeout')),
+    });
+    const notJson = vi.fn().mockResolvedValue(new Response('<html>', { status: 200 }));
+    for (const fetch of [broken, notJson]) {
+      const provider = new ElevenLabsVoiceProvider({ apiKey: KEY, fetch });
+      const error = await provider
+        .synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' })
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(VoiceProviderError);
+      expect(error).toMatchObject({ status: null, retryable: true });
+    }
+  });
+
   it('refuses an answer without timings', async () => {
     const provider = new ElevenLabsVoiceProvider({
       apiKey: KEY,

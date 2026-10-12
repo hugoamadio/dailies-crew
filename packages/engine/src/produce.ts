@@ -113,7 +113,7 @@ export async function produceVideo(options: ProduceOptions): Promise<ProduceResu
     plan,
     provider,
     publicDir,
-    { cacheFile: path.join(workDir, 'voice-cache.json') },
+    { cacheFile: path.join(workDir, 'voice-cache.json'), signal: options.signal },
   );
 
   options.onStage?.('resolve');

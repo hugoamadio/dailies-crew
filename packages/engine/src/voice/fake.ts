@@ -5,6 +5,7 @@ import { silentWav } from './wav';
 /** Silent voice with predictable timings: tests, CI and dry runs never pay for a voice */
 export class FakeVoiceProvider implements VoiceProvider {
   readonly name = 'fake';
+  readonly cacheKey = 'fake';
 
   async synthesize({ text }: SynthesisRequest): Promise<SynthesisResult> {
     const { words, durationSeconds } = fakeWords(text);

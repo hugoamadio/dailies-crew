@@ -29,6 +29,7 @@ interface TimestampsResponse {
 /** ElevenLabs text to speech with character timestamps (best voices; paid per character) */
 export class ElevenLabsVoiceProvider implements VoiceProvider {
   readonly name = 'elevenlabs';
+  readonly cacheKey: string;
   private readonly apiKey: string;
   private readonly modelId: string;
   private readonly baseUrl: string;
@@ -38,6 +39,7 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
   constructor(options: Options) {
     this.apiKey = options.apiKey;
     this.modelId = options.modelId ?? ELEVENLABS_DEFAULT_MODEL;
+    this.cacheKey = `elevenlabs:${this.modelId}`;
     this.baseUrl = (options.baseUrl ?? 'https://api.elevenlabs.io').replace(/\/+$/, '');
     this.fetch = options.fetch ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 120_000;
@@ -74,9 +76,19 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
         response.status === 429 || response.status >= 500,
       );
     }
-    const body = (await response.json()) as TimestampsResponse;
-    const alignment = body.alignment;
-    if (!body.audio_base64 || !alignment || alignment.characters.length === 0) {
+    let body: TimestampsResponse;
+    try {
+      body = (await response.json()) as TimestampsResponse;
+    } catch (error) {
+      // the body timed out halfway or is not JSON: nothing was received, trying again can help
+      throw new VoiceProviderError(
+        `ElevenLabs sent an unreadable answer: ${error instanceof Error ? error.message : String(error)}`,
+        null,
+        true,
+      );
+    }
+    const alignment = body?.alignment;
+    if (!body?.audio_base64 || !alignment || alignment.characters.length === 0) {
       throw new VoiceProviderError('ElevenLabs sent no timing for the voice');
     }
     const words = alignmentToWords(

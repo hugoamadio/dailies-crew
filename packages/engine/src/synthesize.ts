@@ -14,23 +14,40 @@ interface CacheEntry {
 type CacheIndex = Record<string, CacheEntry>;
 
 /** The same text, voice and provider always sound the same: one paid synthesis is enough */
-function cacheKey(provider: string, voiceId: string, text: string): string {
-  return createHash('sha256').update(`${provider}\n${voiceId}\n${text}`).digest('hex').slice(0, 32);
+function cacheKey(provider: VoiceProvider, voiceId: string, language: string, text: string) {
+  const parts = [provider.name, provider.cacheKey ?? '', voiceId, language, text];
+  return createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 32);
 }
 
 async function readIndex(cacheFile: string): Promise<CacheIndex> {
   try {
-    return JSON.parse(await fs.readFile(cacheFile, 'utf8')) as CacheIndex;
+    const parsed: unknown = JSON.parse(await fs.readFile(cacheFile, 'utf8'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as CacheIndex)
+      : {};
   } catch {
     return {};
   }
 }
 
-async function exists(file: string): Promise<boolean> {
-  return fs.access(file).then(
-    () => true,
-    () => false,
+/** An entry is only reused when it is whole; anything else is a miss and the line is made again */
+async function usableEntry(entry: unknown, cacheDir: string): Promise<CacheEntry | null> {
+  if (!entry || typeof entry !== 'object') return null;
+  const { file, words, durationSeconds } = entry as Partial<CacheEntry>;
+  if (typeof file !== 'string' || !Array.isArray(words)) return null;
+  if (typeof durationSeconds !== 'number' || !Number.isFinite(durationSeconds)) return null;
+  const size = await fs.stat(path.join(cacheDir, file)).then(
+    (stat) => (stat.isFile() ? stat.size : 0),
+    () => 0,
   );
+  return size > 0 ? { file, words, durationSeconds } : null;
+}
+
+/** Written under a temporary name and renamed, so a crash never leaves half an index */
+async function writeIndex(cacheFile: string, index: CacheIndex): Promise<void> {
+  const temporary = `${cacheFile}.${process.pid}.tmp`;
+  await fs.writeFile(temporary, JSON.stringify(index, null, 2));
+  await fs.rename(temporary, cacheFile);
 }
 
 export interface SynthesisOutcome {
@@ -50,7 +67,7 @@ export async function synthesizeVoice(
   plan: Plan,
   provider: VoiceProvider,
   publicDir: string,
-  options: { cacheFile?: string } = {},
+  options: { cacheFile?: string; signal?: AbortSignal } = {},
 ): Promise<SynthesisOutcome> {
   const { lines } = plan.voice;
   const tracks: VoiceTrack[] = [];
@@ -62,9 +79,10 @@ export async function synthesizeVoice(
   const index = cacheFile ? await readIndex(cacheFile) : {};
 
   for (const [position, line] of lines.entries()) {
-    const key = cacheKey(provider.name, plan.voice.voiceId, line.text);
-    const cached = index[key];
-    if (cacheDir && cached && (await exists(path.join(cacheDir, cached.file)))) {
+    options.signal?.throwIfAborted();
+    const key = cacheKey(provider, plan.voice.voiceId, plan.voice.language, line.text);
+    const cached = cacheDir ? await usableEntry(index[key], cacheDir) : null;
+    if (cacheDir && cached) {
       const src = `voice/${line.id}${path.extname(cached.file)}`;
       await fs.copyFile(path.join(cacheDir, cached.file), path.join(publicDir, src));
       tracks.push({
@@ -90,7 +108,7 @@ export async function synthesizeVoice(
       await fs.mkdir(path.join(cacheDir, 'voice-cache'), { recursive: true });
       await fs.writeFile(path.join(cacheDir, file), result.audio);
       index[key] = { file, words: result.words, durationSeconds: result.durationSeconds };
-      await fs.writeFile(cacheFile, JSON.stringify(index, null, 2));
+      await writeIndex(cacheFile, index);
     }
     tracks.push({
       lineId: line.id,
