@@ -1,0 +1,18 @@
+{
+  "name": "@dailies-crew/studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0",
+    "@dailies-crew/db": "*",
+    "@dailies-crew/engine": "*",
+    "@dailies-crew/plan": "*",
+    "@dailies-crew/scenes": "*",
+    "pg-boss": "12.37.1",
+    "zod": "4.6.5"
+  }
+}
