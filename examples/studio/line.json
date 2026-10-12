@@ -1,0 +1,25 @@
+{
+  "name": "Store products",
+  "kind": "product",
+  "material": { "select": "all" },
+  "perDay": 3,
+  "hour": 9,
+  "language": "pt-BR",
+  "objective": "sell the product: take people to the link in the bio",
+  "audience": "people who like design and 3D printed decoration",
+  "tone": "energetic and warm",
+  "brand": {
+    "colors": {
+      "background": "#0E0E10",
+      "surface": "#1C1C22",
+      "text": "#FFFFFF",
+      "primary": "#2B2B33",
+      "accent": "#FFC83D"
+    },
+    "headingFont": "Montserrat",
+    "bodyFont": "Inter",
+    "personality": "energetic"
+  },
+  "voice": { "provider": "fake", "voiceId": "demo" },
+  "monthlyCapUsd": 10
+}

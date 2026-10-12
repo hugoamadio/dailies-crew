@@ -1,0 +1,13 @@
+{
+  "name": "@dailies-crew/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@dailies-crew/db": "*",
+    "@dailies-crew/engine": "*",
+    "@dailies-crew/studio": "*",
+    "@remotion/renderer": "4.0.534",
+    "pg-boss": "12.37.1"
+  }
+}
