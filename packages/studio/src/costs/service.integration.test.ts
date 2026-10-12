@@ -106,4 +106,21 @@ describe('cost service', () => {
     });
     expect(await checkBudget(db, settings, b, now)).toEqual({ ok: true });
   });
+
+  it('stops a line whose float sum falls just under the cap (0.1 + 0.7 against 0.8)', async () => {
+    const settings = await getSettings(db);
+    const line = await makeLine('A', 0.8);
+    const now = new Date('2026-10-12T15:00:00Z');
+    await db.costEntry.createMany({
+      data: [0.1, 0.7].map((usd) => ({
+        lineId: line.id,
+        role: 'director',
+        model: 'claude-opus-5-5',
+        usd,
+        createdAt: new Date('2026-10-02T12:00:00Z'),
+      })),
+    });
+    expect(await spendBetween(db, { since: new Date('2026-10-01T03:00:00Z') })).toBe(0.8);
+    expect((await checkBudget(db, settings, line, now)).ok).toBe(false);
+  });
 });

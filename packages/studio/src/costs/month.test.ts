@@ -23,6 +23,15 @@ describe('monthStart', () => {
   });
 });
 
+describe('monthStart boundary', () => {
+  it('flips exactly at midnight in São Paulo', () => {
+    const before = monthStart(new Date('2026-10-01T02:59:59.999Z'), 'America/Sao_Paulo');
+    const at = monthStart(new Date('2026-10-01T03:00:00.000Z'), 'America/Sao_Paulo');
+    expect(before.toISOString()).toBe('2026-09-01T03:00:00.000Z');
+    expect(at.toISOString()).toBe('2026-10-01T03:00:00.000Z');
+  });
+});
+
 describe('monthRange', () => {
   it('spans one month, December included', () => {
     const range = monthRange('2026-12', 'America/Sao_Paulo');

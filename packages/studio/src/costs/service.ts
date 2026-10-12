@@ -6,6 +6,7 @@ import {
   budgetVerdict,
   llmUsd,
   priceFor,
+  roundUsd,
   type TokenUsage,
   voiceUsd,
 } from './math';
@@ -90,7 +91,8 @@ export async function spendBetween(
       ...(range.lineId ? { lineId: range.lineId } : {}),
     },
   });
-  return result._sum.usd ?? 0;
+  // each entry is rounded to the micro-dollar; their float sum must be too, or 0.1 + 0.7 < 0.8
+  return roundUsd(result._sum.usd ?? 0);
 }
 
 /** Compares this month's spending (in the settings' time zone) with the line's and the global cap */
