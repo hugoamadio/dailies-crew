@@ -43,11 +43,16 @@ describe('the studio end to end (fake AI, fake voice, real render)', () => {
     await db.$executeRawUnsafe('DROP SCHEMA IF EXISTS pgboss_e2e CASCADE');
     const dataDir = await tempDataDir();
     const logs: string[] = [];
-    const runtime = await createRuntime(
-      { DATABASE_URL: inject('testDatabaseUrl'), DAILIES_FAKE_AI: '1', DAILIES_DATA_DIR: dataDir },
-      { queue: true, worker: true, bossSchema: 'pgboss_e2e', log: (line) => logs.push(line) },
-    );
+    let runtime: Awaited<ReturnType<typeof createRuntime>> | undefined;
     try {
+      runtime = await createRuntime(
+        {
+          DATABASE_URL: inject('testDatabaseUrl'),
+          DAILIES_FAKE_AI: '1',
+          DAILIES_DATA_DIR: dataDir,
+        },
+        { queue: true, worker: true, bossSchema: 'pgboss_e2e', log: (line) => logs.push(line) },
+      );
       const line = await createLine(runtime.ctx, productLineInput(), { logoFile: LOGO_SVG });
       await createProduct(runtime.ctx, productInput(), [LAMP_SVG]);
       await startWorkers(runtime.boss!, runtime.ctx, STAGE_HANDLERS);
@@ -74,11 +79,24 @@ describe('the studio end to end (fake AI, fake voice, real render)', () => {
       expect(video.frameFiles.length).toBeGreaterThanOrEqual(30);
       expect(video.frameFiles.every((frame) => existsSync(path.join(dataDir, frame)))).toBe(true);
       expect(existsSync(path.join(dataDir, 'jobs', video.id, 'bundle'))).toBe(false);
-      expect(video.social).toMatchObject({ youtube: { title: expect.any(String) } });
+      const post = {
+        title: expect.any(String),
+        description: expect.any(String),
+        hashtags: expect.arrayContaining([expect.stringMatching(/^#/)]),
+      };
+      expect(video.social).toMatchObject({
+        youtube: post,
+        tiktok: post,
+        instagram: post,
+        facebook: post,
+      });
 
       expect((await approveVideo(runtime.ctx, video.id)).status).toBe('approved');
+      const approved = await db.video.findUniqueOrThrow({ where: { id: video.id } });
+      expect(approved.status).toBe('approved');
     } finally {
-      await runtime.close();
+      await runtime?.close();
+      await db.$executeRawUnsafe('DROP SCHEMA IF EXISTS pgboss_e2e CASCADE');
       await fs.rm(dataDir, { recursive: true, force: true });
     }
   }, 900_000);
