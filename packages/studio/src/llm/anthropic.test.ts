@@ -4,6 +4,7 @@ import {
   AuthenticationError,
   BadRequestError,
   InternalServerError,
+  PermissionDeniedError,
   RateLimitError,
 } from '@anthropic-ai/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +18,13 @@ const Answer = z.strictObject({
   score: z.number().int().min(0).max(10),
 });
 
-const api = { messages: { create: vi.fn() }, beta: { messages: { create: vi.fn() } } };
+const plain = vi.fn();
+const beta = vi.fn();
+// stream(...) returns an object whose finalMessage() resolves (or rejects) like the SDK's stream
+const api = {
+  messages: { stream: (body: unknown) => ({ finalMessage: () => plain(body) }) },
+  beta: { messages: { stream: (body: unknown) => ({ finalMessage: () => beta(body) }) } },
+};
 const llm = new AnthropicLlm({ api });
 
 function request(model: string, overrides: Partial<LlmRequest<unknown>> = {}) {
@@ -58,7 +65,7 @@ beforeEach(() => {
 
 describe('AnthropicLlm', () => {
   it('asks Sonnet and Opus through the beta endpoint with the server-side fallback', async () => {
-    api.beta.messages.create.mockResolvedValue(message('{"title":"Lua","score":8}'));
+    beta.mockResolvedValue(message('{"title":"Lua","score":8}'));
     const result = await llm.generate(
       request('claude-sonnet-5-5', {
         content: [
@@ -73,7 +80,7 @@ describe('AnthropicLlm', () => {
       model: 'claude-sonnet-5-5',
       usage: { inputTokens: 1200, outputTokens: 300, cacheReadTokens: 100, cacheWriteTokens: 0 },
     });
-    const body = api.beta.messages.create.mock.calls[0]![0];
+    const body = beta.mock.calls[0]![0];
     expect(body).toMatchObject({
       model: 'claude-sonnet-5-5',
       max_tokens: 8000,
@@ -100,20 +107,20 @@ describe('AnthropicLlm', () => {
       type: 'json_schema',
       schema: { type: 'object', additionalProperties: false, required: ['title', 'score'] },
     });
-    expect(api.messages.create).not.toHaveBeenCalled();
+    expect(plain).not.toHaveBeenCalled();
   });
 
   it('asks Haiku through the plain endpoint, without fallback', async () => {
-    api.messages.create.mockResolvedValue(message('{"title":"Lua","score":3}'));
+    plain.mockResolvedValue(message('{"title":"Lua","score":3}'));
     await llm.generate(request('claude-haiku-5-5'));
-    const body = api.messages.create.mock.calls[0]![0];
+    const body = plain.mock.calls[0]![0];
     expect(body).not.toHaveProperty('betas');
     expect(body).not.toHaveProperty('fallbacks');
-    expect(api.beta.messages.create).not.toHaveBeenCalled();
+    expect(beta).not.toHaveBeenCalled();
   });
 
   it('turns a refusal, a cut answer and a broken rule into typed errors', async () => {
-    api.beta.messages.create.mockResolvedValueOnce(
+    beta.mockResolvedValueOnce(
       message('', {
         stop_reason: 'refusal',
         content: [],
@@ -122,15 +129,11 @@ describe('AnthropicLlm', () => {
     );
     await expect(llm.generate(request('claude-opus-5-5'))).rejects.toThrow(LlmRefusalError);
 
-    api.beta.messages.create.mockResolvedValueOnce(
-      message('{"title":"Lu', { stop_reason: 'max_tokens' }),
-    );
+    beta.mockResolvedValueOnce(message('{"title":"Lu', { stop_reason: 'max_tokens' }));
     await expect(llm.generate(request('claude-opus-5-5'))).rejects.toThrow(LlmTruncatedError);
 
     // maxLength is not sent to the API, so the zod schema is what catches it
-    api.beta.messages.create.mockResolvedValueOnce(
-      message('{"title":"A very long title","score":8}'),
-    );
+    beta.mockResolvedValueOnce(message('{"title":"A very long title","score":8}'));
     const error = await llm.generate(request('claude-opus-5-5')).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(LlmInvalidOutputError);
     expect((error as LlmInvalidOutputError).issues[0]).toMatch(/^- title: /);
@@ -142,6 +145,23 @@ describe('AnthropicLlm', () => {
     [
       new AuthenticationError(401, {}, 'invalid x-api-key', headers, 'authentication_error'),
       'auth',
+      false,
+    ],
+    [new PermissionDeniedError(403, {}, 'forbidden', headers, 'permission_error'), 'auth', false],
+    [
+      new BadRequestError(
+        400,
+        {
+          error: {
+            type: 'invalid_request_error',
+            message: 'Your credit balance is too low to access the API',
+          },
+        },
+        undefined,
+        headers,
+        'invalid_request_error',
+      ),
+      'credit',
       false,
     ],
     [new APIError(402, {}, 'billing', headers, 'billing_error'), 'credit', false],
@@ -158,15 +178,49 @@ describe('AnthropicLlm', () => {
       false,
     ],
   ])('classifies %s', async (sdkError, kind, retryable) => {
-    api.beta.messages.create.mockRejectedValue(sdkError);
+    beta.mockRejectedValue(sdkError);
     const error = await llm.generate(request('claude-opus-5-5')).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(LlmError);
     expect(error).toMatchObject({ kind, retryable });
   });
 
+  it('reports the model that answered, which a fallback can make different', async () => {
+    beta.mockResolvedValue(message('{"title":"Lua","score":8}', { model: 'claude-sonnet-5' }));
+    const result = await llm.generate(request('claude-sonnet-5-5'));
+    expect(result.model).toBe('claude-sonnet-5');
+  });
+
+  it('joins every text block of the answer, in order', async () => {
+    beta.mockResolvedValue(
+      message('', {
+        content: [
+          { type: 'text', text: '{"title":"Lu', citations: null },
+          { type: 'thinking', thinking: '', signature: 'x' },
+          { type: 'text', text: 'a","score":8}', citations: null },
+        ],
+      }),
+    );
+    const result = await llm.generate(request('claude-opus-5-5'));
+    expect(result.data).toEqual({ title: 'Lua', score: 8 });
+  });
+
+  it('turns malformed JSON and a missing text block into invalid_output', async () => {
+    beta.mockResolvedValueOnce(message('{"title":'));
+    await expect(llm.generate(request('claude-opus-5-5'))).rejects.toMatchObject({
+      kind: 'invalid_output',
+    });
+    beta.mockResolvedValueOnce(message('', { content: [] }));
+    await expect(llm.generate(request('claude-opus-5-5'))).rejects.toThrow('no text');
+  });
+
+  it('treats a full context window like a cut answer', async () => {
+    beta.mockResolvedValue(message('{"ti', { stop_reason: 'model_context_window_exceeded' }));
+    await expect(llm.generate(request('claude-opus-5-5'))).rejects.toThrow(LlmTruncatedError);
+  });
+
   it('lets errors that do not come from the SDK through untouched', async () => {
     const bug = new TypeError('x is undefined');
-    api.beta.messages.create.mockRejectedValue(bug);
+    beta.mockRejectedValue(bug);
     await expect(llm.generate(request('claude-opus-5-5'))).rejects.toBe(bug);
   });
 });

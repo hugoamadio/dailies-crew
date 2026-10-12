@@ -36,7 +36,7 @@ export class FakeLlm implements LlmClient {
     return {
       data: parseAnswer(request.role, request.schema, answer),
       model: request.model,
-      usage: ZERO_USAGE,
+      usage: { ...ZERO_USAGE },
     };
   }
 }

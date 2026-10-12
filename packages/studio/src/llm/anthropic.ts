@@ -3,35 +3,41 @@ import Anthropic, {
   APIConnectionError,
   APIError,
   AuthenticationError,
+  BadRequestError,
   PermissionDeniedError,
   RateLimitError,
 } from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type {
   BetaMessage,
-  MessageCreateParamsNonStreaming as BetaMessageCreateParams,
+  BetaMessageStreamParams,
 } from '@anthropic-ai/sdk/resources/beta/messages';
 import type {
   ImageBlockParam,
   Message,
-  MessageCreateParamsNonStreaming,
   TextBlockParam,
 } from '@anthropic-ai/sdk/resources/messages';
+import type { MessageStreamParams } from '@anthropic-ai/sdk/resources/messages/messages';
 import type { RoleName } from '../roles';
 import { LlmError, LlmInvalidOutputError, LlmRefusalError, LlmTruncatedError } from './errors';
 import { parseJsonAnswer } from './parse';
 import type { LlmClient, LlmContent, LlmRequest, LlmResult } from './types';
 
-/** An explicit timeout also lifts the SDK's "use streaming" guard on large max_tokens */
+/**
+ * Explicit timeout and retries. The SDK arms the timeout only until the response headers arrive;
+ * calls stream (see below) so the headers come at once and a long answer is never cut by it.
+ */
 export const ANTHROPIC_TIMEOUT_MS = 10 * 60 * 1000;
 export const ANTHROPIC_MAX_RETRIES = 2;
 /** Server-side fallback in its "default" form: Anthropic picks the model by refusal category */
 export const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
-/** The two SDK methods AnthropicLlm calls; the tests pass mocks */
+/** The two SDK methods AnthropicLlm calls (streamed, read as one final message); the tests pass mocks */
 export interface AnthropicMessagesApi {
-  messages: { create(body: MessageCreateParamsNonStreaming): Promise<Message> };
-  beta: { messages: { create(body: BetaMessageCreateParams): Promise<BetaMessage> } };
+  messages: { stream(body: MessageStreamParams): { finalMessage(): Promise<Message> } };
+  beta: {
+    messages: { stream(body: BetaMessageStreamParams): { finalMessage(): Promise<BetaMessage> } };
+  };
 }
 
 /** Haiku has no server-side fallback: a fallback list is a 400 and "default" does nothing */
@@ -59,7 +65,16 @@ export function classifyError(role: RoleName, error: unknown): unknown {
   if (error instanceof AuthenticationError || error instanceof PermissionDeniedError) {
     return new LlmError('auth', `${what}: the API key was refused (${error.status})`, false);
   }
-  if (error instanceof APIError && (error.status === 402 || error.type === 'billing_error')) {
+  // The API has answered an empty balance as a 400 "Your credit balance is too low...", so this
+  // one message check exists; everything else is classified by class and status.
+  const emptyBalance =
+    error instanceof BadRequestError &&
+    error.type === 'invalid_request_error' &&
+    /credit balance/i.test(error.message);
+  if (
+    emptyBalance ||
+    (error instanceof APIError && (error.status === 402 || error.type === 'billing_error'))
+  ) {
     return new LlmError('credit', `${what}: billing problem, check the credit balance`, false);
   }
   if (error instanceof RateLimitError) {
@@ -86,6 +101,8 @@ export class AnthropicLlm implements LlmClient {
         ? options.api
         : new Anthropic({
             apiKey: options.apiKey,
+            // a stray ANTHROPIC_AUTH_TOKEN would add a second auth header and look like a refused key
+            authToken: null,
             maxRetries: ANTHROPIC_MAX_RETRIES,
             timeout: ANTHROPIC_TIMEOUT_MS,
           });
@@ -103,27 +120,27 @@ export class AnthropicLlm implements LlmClient {
     let message: Message | BetaMessage;
     try {
       message = usesFallback(request.model)
-        ? await this.api.beta.messages.create({
-            ...body,
-            betas: [FALLBACK_BETA],
-            fallbacks: 'default',
-          })
-        : await this.api.messages.create(body);
+        ? await this.api.beta.messages
+            .stream({ ...body, betas: [FALLBACK_BETA], fallbacks: 'default' })
+            .finalMessage()
+        : await this.api.messages.stream(body).finalMessage();
     } catch (error) {
       throw classifyError(request.role, error);
     }
     if (message.stop_reason === 'refusal') {
       throw new LlmRefusalError(request.role, message.stop_details?.category ?? null);
     }
-    if (message.stop_reason === 'max_tokens') {
+    if (
+      message.stop_reason === 'max_tokens' ||
+      message.stop_reason === 'model_context_window_exceeded'
+    ) {
       throw new LlmTruncatedError(request.role, request.maxTokens);
     }
-    const text = message.content.find(
-      (block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text',
-    )?.text;
-    if (text === undefined) throw new LlmInvalidOutputError(request.role, ['- (answer): no text']);
+    // A mid-stream fallback leaves the refused model's partial text and continues in a second block
+    const texts = message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []));
+    if (texts.length === 0) throw new LlmInvalidOutputError(request.role, ['- (answer): no text']);
     return {
-      data: parseJsonAnswer(request.role, request.schema, text),
+      data: parseJsonAnswer(request.role, request.schema, texts.join('')),
       model: message.model,
       usage: {
         inputTokens: message.usage.input_tokens,
