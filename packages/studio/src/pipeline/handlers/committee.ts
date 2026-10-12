@@ -11,6 +11,7 @@ import type { StageHandler } from '../handler';
 import { briefingOf, latestOutput } from '../inputs';
 import { json } from '../json';
 import type { StyledIdea } from './ideas';
+import { allSettledOrThrow } from './settle';
 
 /** Banked ideas of the same subject that compete again with today's six */
 export const BANKED_CANDIDATES = 2;
@@ -43,7 +44,7 @@ export const committee: StageHandler = async (ctx, run) => {
     })),
   ];
   const briefing = briefingOf(run.video);
-  const answers = await Promise.all(
+  const answers = await allSettledOrThrow(
     JUDGE_CRITERIA.map(async (criterion) => {
       const request = buildJudgeRequest(
         {
@@ -73,10 +74,16 @@ export const committee: StageHandler = async (ctx, run) => {
         const scored = { scores: json(tally.scores), total: tally.total };
         if (idea.bankedId) {
           if (idea.key === decision.winner) {
-            await tx.idea.update({
-              where: { id: idea.bankedId },
+            // another video of the same line may have taken it since the judges read the bank
+            const taken = await tx.idea.updateMany({
+              where: { id: idea.bankedId, status: 'banked' },
               data: { ...scored, status: 'used', videoId: run.video.id },
             });
+            if (taken.count === 0) {
+              throw new Error(
+                `Banked idea ${idea.bankedId} was taken by another video; judging again`,
+              );
+            }
           }
           continue;
         }

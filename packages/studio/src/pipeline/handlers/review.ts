@@ -14,6 +14,7 @@ import type { StageHandler } from '../handler';
 import { chosenIdeaOf, latestOutput, scriptOf } from '../inputs';
 import { json } from '../json';
 import { type ProduceOutput, REVIEW_FRAMES } from './produce';
+import { allSettledOrThrow } from './settle';
 
 /**
  * Three reviewers (art, rhythm, fidelity) watch the frames. The first call puts the frames in the
@@ -57,7 +58,7 @@ export const review: StageHandler = async (ctx, run) => {
       ),
     );
   const art = await ask('art');
-  const [rhythm, fidelity] = await Promise.all([ask('rhythm'), ask('fidelity')]);
+  const [rhythm, fidelity] = await allSettledOrThrow([ask('rhythm'), ask('fidelity')]);
   const verdicts: Record<ReviewFocus, Review> = { art, rhythm, fidelity };
   const decision = decideReview(verdicts, run.video.reviewRounds);
   const persist = (tx: Tx) =>

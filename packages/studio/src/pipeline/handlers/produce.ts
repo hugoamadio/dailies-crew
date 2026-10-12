@@ -71,6 +71,7 @@ export const produce: StageHandler = async (ctx, run) => {
   } catch (error) {
     if (!(error instanceof PlanError)) throw error;
     const issues = formatIssues(error.issues).split('\n');
+    const plain = issues.map((issue) => issue.replace(/^- /, ''));
     // a scene too long for its piece: the director picks another piece; the whole video too long
     // or too short: the scriptwriter changes the narration
     const stage = error.issues.some((issue) => issue.path === 'scenes') ? 'script' : 'direction';
@@ -87,7 +88,7 @@ export const produce: StageHandler = async (ctx, run) => {
       outcome: {
         kind: 'rework',
         from: stage,
-        instructions: issues.map((issue) => ({
+        instructions: plain.map((issue) => ({
           stage,
           instruction: `With the real voice the plan breaks a rule; fix it: ${issue}`,
           source: 'review' as const,

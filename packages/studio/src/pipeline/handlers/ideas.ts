@@ -6,6 +6,7 @@ import {
 } from '../../crew/creator';
 import type { StageHandler } from '../handler';
 import { briefingOf } from '../inputs';
+import { allSettledOrThrow } from './settle';
 
 export interface StyledIdea extends IdeaDraft {
   style: CreatorStyle;
@@ -23,7 +24,7 @@ export const ideas: StageHandler = async (ctx, run) => {
     take: 20,
   });
   const briefing = briefingOf(run.video);
-  const answers = await Promise.all(
+  const answers = await allSettledOrThrow(
     CREATOR_STYLES.map(async (style) => {
       const request = buildCreateRequest(
         {
