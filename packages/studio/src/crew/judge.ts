@@ -17,7 +17,11 @@ export type JudgeCriterion = (typeof JUDGE_CRITERIA)[number];
 /** An idea that loses but scores at least this sum (an average of 7 out of 10) goes to the bank */
 export const BANK_MIN_TOTAL = 21;
 
-/** The scores must cover every idea exactly once; the ids are enumerated in the JSON schema */
+/**
+ * The scores must cover every idea exactly once. The API receives the allowed ids only as
+ * description text (the SDK drops `enum` from strict schemas); zod rejects anything else after
+ * the answer.
+ */
 export function judgeSchema(ideaKeys: readonly string[]) {
   const [first, ...rest] = ideaKeys;
   if (!first) throw new Error('A judge needs at least one idea');

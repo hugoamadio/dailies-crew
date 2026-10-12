@@ -1,3 +1,4 @@
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { describe, expect, it } from 'vitest';
 import { expectApiSchema } from '../../test/api-schema';
 import { briefing, idea, lamp, recipe, roles } from '../../test/crew-fixtures';
@@ -30,8 +31,16 @@ function verdict(scores: Record<string, number>): JudgeOutput {
 }
 
 describe('judgeSchema', () => {
-  it('is a schema the API accepts, with the idea ids as an enum', () => {
-    expectApiSchema(judgeSchema(['idea-1', 'idea-2']));
+  it('is a schema the API accepts, lists the idea ids for the model and lets zod enforce them', () => {
+    const schema = judgeSchema(['idea-1', 'idea-2']);
+    expectApiSchema(schema);
+    // The SDK hoists the scores array into $defs and refers to it
+    const sent = zodOutputFormat(schema).schema as {
+      $defs: Record<string, { items: { properties: { ideaId: { description?: string } } } }>;
+    };
+    const description = Object.values(sent.$defs)[0]?.items.properties.ideaId.description ?? '';
+    expect(description).toContain('idea-1');
+    expect(description).toContain('idea-2');
   });
 
   it('wants every idea scored exactly once', () => {
@@ -42,6 +51,15 @@ describe('judgeSchema', () => {
       'idea idea-2 must be scored exactly once (scored 0 times)',
     );
     expect(schema.safeParse(verdict({ 'idea-1': 5, 'idea-9': 7 })).success).toBe(false);
+    const twice = schema.safeParse({
+      scores: [
+        ...verdict({ 'idea-1': 5, 'idea-2': 7 }).scores,
+        { ideaId: 'idea-2', score: 6, reason: 'Clear hook' },
+      ],
+    });
+    expect(twice.error?.issues[0]?.message).toBe(
+      'idea idea-2 must be scored exactly once (scored 2 times)',
+    );
   });
 });
 
