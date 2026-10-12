@@ -18,6 +18,7 @@ import type {
   TextBlockParam,
 } from '@anthropic-ai/sdk/resources/messages';
 import type { MessageStreamParams } from '@anthropic-ai/sdk/resources/messages/messages';
+import type { z } from 'zod';
 import type { RoleName } from '../roles';
 import { LlmError, LlmInvalidOutputError, LlmRefusalError, LlmTruncatedError } from './errors';
 import { parseJsonAnswer } from './parse';
@@ -53,6 +54,16 @@ function toBlock(content: LlmContent): TextBlockParam | ImageBlockParam {
     source: { type: 'base64', media_type: content.mediaType, data: content.data },
     ...cache,
   };
+}
+
+/**
+ * Only the JSON schema is sent. zodOutputFormat also carries a `parse` hook, and with it the SDK's
+ * stream helper parses every text block itself and rejects with a generic error, hiding the stop
+ * reason and the zod issues; without it the helper leaves the text alone and generate() checks it.
+ */
+function outputFormat<T>(schema: z.ZodType<T>) {
+  const { type, schema: jsonSchema } = zodOutputFormat(schema);
+  return { type, schema: jsonSchema };
 }
 
 /** SDK errors become LlmErrors (by class and status, never by message text) */
@@ -115,7 +126,7 @@ export class AnthropicLlm implements LlmClient {
       system: request.system,
       messages: [{ role: 'user' as const, content: request.content.map(toBlock) }],
       thinking: { type: 'adaptive' as const },
-      output_config: { effort: request.effort, format: zodOutputFormat(request.schema) },
+      output_config: { effort: request.effort, format: outputFormat(request.schema) },
     };
     let message: Message | BetaMessage;
     try {
