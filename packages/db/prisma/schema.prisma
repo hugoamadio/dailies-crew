@@ -1,0 +1,313 @@
+// Database schema of Dailies Crew (Prisma ORM 7). Docs: https://pris.ly/d/prisma-schema
+// After changing a model (with "npm run db:up" running):
+//   1) npm run db:migrate -- --name <description>   creates the migration and applies it
+//   2) npm run db:generate                           updates the client (Prisma 7 migrate does not)
+// Ids are UUID v7 (time ordered). Every timestamp is a timestamptz. Money is in US dollars.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LineKind {
+  product
+  brand
+  topic
+}
+
+enum VideoStatus {
+  queued
+  running
+  needs_you
+  ready_for_review
+  approved
+  rejected
+  failed
+  paused_budget
+}
+
+enum Stage {
+  prepare
+  ideas
+  committee
+  script
+  direction
+  produce
+  review
+  social
+}
+
+enum StageRunStatus {
+  running
+  done
+  failed
+}
+
+enum IdeaStatus {
+  chosen
+  banked
+  used
+  discarded
+}
+
+enum DecisionKind {
+  approve
+  reject
+}
+
+enum RejectMode {
+  redo
+  learn
+}
+
+/// A single row (id 1): the crews' models, the price table, the global cap and the schedule
+model Settings {
+  id                  Int       @id @default(1)
+  /// { [role]: { model, effort } } (packages/studio/src/settings/schema.ts)
+  roles               Json
+  /// { models: { [model]: { input, output, cacheRead, cacheWrite } }, voicePer1kChars: { elevenlabs, fake } }:
+  /// USD per million tokens and per 1000 voice characters
+  prices              Json
+  globalMonthlyCapUsd Float     @map("global_monthly_cap_usd")
+  /// Hour suggested for new lines, 0-23
+  defaultHour         Int       @map("default_hour")
+  /// IANA time zone of the line hours and of the spending month
+  timezone            String
+  /// Set when the Claude API refused the key or the credit ran out; cleared by "crew resume"
+  warning             String?
+  warningAt           DateTime? @map("warning_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("settings")
+}
+
+model ProductionLine {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  name          String
+  kind          LineKind
+  /// Shape depends on kind (packages/studio/src/lines/schema.ts)
+  material      Json
+  perDay        Int      @map("per_day")
+  /// Hour of the daily run, 0-23, in Settings.timezone
+  hour          Int
+  /// BCP 47 language of the videos, e.g. "pt-BR"
+  language      String
+  objective     String
+  audience      String
+  tone          String
+  /// The direction plan's Brand; its logo path is relative to data/assets
+  brand         Json
+  /// "elevenlabs" or "fake"
+  voiceProvider String   @map("voice_provider")
+  voiceId       String   @map("voice_id")
+  /// Relative to data/assets, e.g. "music/calm.mp3"
+  musicTrack    String?  @map("music_track")
+  monthlyCapUsd Float    @map("monthly_cap_usd")
+  active        Boolean  @default(true)
+  /// Why the system paused the line (spending cap, API key); null when it runs or Hugo paused it
+  pausedReason  String?  @map("paused_reason")
+  /// The last problem a daily run met instead of making videos (e.g. no product to show)
+  warning       String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  rules  LearnedRule[]
+  videos Video[]
+  ideas  Idea[]
+  costs  CostEntry[]
+
+  @@map("production_lines")
+}
+
+/// A lesson from a rejection ("learn"), given to every crew of the line
+model LearnedRule {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  lineId        String   @map("line_id") @db.Uuid
+  text          String
+  sourceVideoId String?  @map("source_video_id") @db.Uuid
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  line        ProductionLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  sourceVideo Video?         @relation(fields: [sourceVideoId], references: [id], onDelete: SetNull)
+
+  @@index([lineId])
+  @@map("learned_rules")
+}
+
+model Product {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  name          String
+  description   String
+  priceCents    Int      @map("price_cents")
+  oldPriceCents Int?     @map("old_price_cents")
+  /// "BRL", "USD" or "EUR" (what the product-price piece formats)
+  currency      String
+  category      String?
+  link          String?
+  /// Relative to data/assets, e.g. "products/<id>/front.png"
+  images        String[]
+  /// Relative to data/assets; used by the 3D pieces of phase 2
+  model3d       String?  @map("model_3d")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  videos Video[]
+  ideas  Idea[]
+
+  @@map("products")
+}
+
+model Video {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  lineId          String      @map("line_id") @db.Uuid
+  productId       String?     @map("product_id") @db.Uuid
+  status          VideoStatus @default(queued)
+  /// The stage running now, or the next one to run, or the one where the video stopped
+  stage           Stage       @default(prepare)
+  /// 0 on the first pass; +1 each time a review or Hugo sends the video back to an earlier stage
+  round           Int         @default(0)
+  /// Review rounds used since the first pass or Hugo's last "redo" (at most 2, then "needs you")
+  reviewRounds    Int         @default(0) @map("review_rounds")
+  /// Extra instructions for the current round: [{ stage, instruction, source }]
+  instructions    Json        @default("[]")
+  briefing        Json?
+  script          Json?
+  /// The validated direction plan (PlanInput), before the voice is generated
+  plan            Json?
+  /// The reviewers' last verdicts
+  review          Json?
+  /// Post texts per network
+  social          Json?
+  /// Relative to the data folder
+  videoFile       String?     @map("video_file")
+  /// Review frames, relative to the data folder
+  frameFiles      String[]    @map("frame_files")
+  durationSeconds Float?      @map("duration_seconds")
+  costUsd         Float       @default(0) @map("cost_usd")
+  failureReason   String?     @map("failure_reason")
+  /// What failed: an LlmError kind, "voice", "plan", "engine" or "unknown"
+  failureKind     String?     @map("failure_kind")
+  /// What the crews could not fix, shown with "needs you"
+  problems        String[]
+  /// The output adapter's answer after approval, e.g. { adapter: "manual", state: "ready_to_post" }
+  publication     Json?
+  /// The pg-boss job of the daily run that created it: a repeated delivery creates nothing twice
+  tickJobId       String?     @map("tick_job_id")
+  readyAt         DateTime?   @map("ready_at") @db.Timestamptz(3)
+  decidedAt       DateTime?   @map("decided_at") @db.Timestamptz(3)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  line      ProductionLine @relation(fields: [lineId], references: [id])
+  product   Product?       @relation(fields: [productId], references: [id])
+  stageRuns StageRun[]
+  ideas     Idea[]
+  costs     CostEntry[]
+  decisions Decision[]
+  rules     LearnedRule[]
+
+  @@index([lineId, createdAt])
+  @@index([productId])
+  @@index([status])
+  @@index([tickJobId])
+  @@map("videos")
+}
+
+/// One run of one stage of a video: what it got, what it gave, what it cost ("bastidores")
+model StageRun {
+  id         String         @id @default(uuid(7)) @db.Uuid
+  videoId    String         @map("video_id") @db.Uuid
+  stage      Stage
+  round      Int
+  /// 1 for the first run of (video, stage, round), +1 for every queue retry
+  attempt    Int
+  status     StageRunStatus
+  input      Json?
+  output     Json?
+  error      String?
+  costUsd    Float          @default(0) @map("cost_usd")
+  startedAt  DateTime       @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime?      @map("finished_at") @db.Timestamptz(3)
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, stage, round, attempt])
+  @@map("stage_runs")
+}
+
+model Idea {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  lineId    String     @map("line_id") @db.Uuid
+  /// The video it was written for, or the video that took it from the bank
+  videoId   String?    @map("video_id") @db.Uuid
+  productId String?    @map("product_id") @db.Uuid
+  /// "funny", "emotional" or "demonstration"
+  style     String
+  title     String
+  hook      String
+  angle     String
+  structure String[]
+  cta       String
+  /// { [judge]: { score, reason } }
+  scores    Json?
+  total     Int?
+  status    IdeaStatus
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  line    ProductionLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  video   Video?         @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  product Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([lineId, status])
+  @@index([videoId])
+  @@map("ideas")
+}
+
+/// One paid call: a Claude request or a voice synthesis
+model CostEntry {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  lineId           String   @map("line_id") @db.Uuid
+  videoId          String?  @map("video_id") @db.Uuid
+  stage            Stage?
+  /// A crew role ("director", ...) or "voice"
+  role             String
+  /// The Claude model that answered, or the voice provider
+  model            String
+  inputTokens      Int      @default(0) @map("input_tokens")
+  outputTokens     Int      @default(0) @map("output_tokens")
+  cacheReadTokens  Int      @default(0) @map("cache_read_tokens")
+  cacheWriteTokens Int      @default(0) @map("cache_write_tokens")
+  voiceCharacters  Int      @default(0) @map("voice_characters")
+  usd              Float
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  line  ProductionLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  video Video?         @relation(fields: [videoId], references: [id], onDelete: SetNull)
+
+  @@index([lineId, createdAt])
+  @@index([createdAt])
+  @@index([videoId])
+  @@map("cost_entries")
+}
+
+/// Hugo's approval or rejection of a video
+model Decision {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  videoId     String       @map("video_id") @db.Uuid
+  kind        DecisionKind
+  reason      String?
+  mode        RejectMode?
+  targetStage Stage?       @map("target_stage")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+  @@map("decisions")
+}

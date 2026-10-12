@@ -6,30 +6,49 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
+    "postinstall": "prisma generate --config packages/db/prisma7.config.ts",
     "test": "vitest run",
     "test:visual": "vitest run --config vitest.visual.config.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc -p tsconfig.json",
     "format": "prettier --write .",
     "studio": "remotion studio packages/scenes/src/index.ts",
-    "dailies": "tsx packages/engine/src/cli.ts"
+    "dailies": "tsx packages/engine/src/cli.ts",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:generate": "prisma generate --config packages/db/prisma7.config.ts",
+    "db:migrate": "prisma migrate dev --config packages/db/prisma7.config.ts",
+    "db:deploy": "prisma migrate deploy --config packages/db/prisma7.config.ts",
+    "worker": "tsx apps/worker/src/main.ts",
+    "crew": "tsx apps/worker/src/crew.ts"
   },
   "devDependencies": {
     "@remotion/cli": "4.0.534",
     "@types/node": "26.6.4",
+    "@types/pg": "8.23.1",
     "@types/pngjs": "6.0.5",
     "@types/react": "19.3.0",
+    "pg": "8.23.1",
     "pixelmatch": "8.0.0",
     "pngjs": "7.0.0",
     "prettier": "3.9.9",
+    "prisma": "7.10.0",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.3"
+  },
+  "allowScripts": {
+    "prisma@7.10.0": true,
+    "@prisma/engines@7.10.0": true
+  },
+  "overrides": {
+    "zod": "4.6.5"
   }
 }

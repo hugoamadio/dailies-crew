@@ -1,0 +1,21 @@
+# The studio's database: "npm run db:up". Port 5436 on this machine only (5432-5435 are taken by
+# other projects here); the data lives in the named volume.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: dailies
+      POSTGRES_PASSWORD: dailies
+      POSTGRES_DB: dailies
+    ports:
+      - '127.0.0.1:5436:5432'
+    volumes:
+      - dailies-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dailies -d dailies']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  dailies-postgres:
