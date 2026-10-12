@@ -49,12 +49,20 @@ export function stripAccents(text: string): string {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-/** A file name the asset paths accept: letters, digits, ".", "_" and "-" only */
+const MAX_STEM_LENGTH = 80;
+const MAX_EXTENSION_LENGTH = 20;
+
+/**
+ * A file name the asset paths accept: letters, digits, ".", "_" and "-" only, with the name
+ * cut to 80 characters (the extension is kept) so the whole path stays under the path limit
+ */
 export function safeFileName(file: string): string {
   const name = stripAccents(path.basename(file))
     .replace(/[^A-Za-z0-9._-]+/g, '-')
     .replace(/^[.-]+/, '');
-  return name || 'file';
+  const extension = path.extname(name).slice(0, MAX_EXTENSION_LENGTH);
+  const stem = name.slice(0, name.length - path.extname(name).length).slice(0, MAX_STEM_LENGTH);
+  return `${stem}${extension}` || 'file';
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
