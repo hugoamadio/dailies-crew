@@ -3,7 +3,7 @@ import { resetDb, testDb } from '@dailies-crew/db/test';
 import { PgBoss } from 'pg-boss';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, inject } from 'vitest';
 import { productLineInput, tempDataDir, topicLineInput } from '../../test/fixtures';
-import { createLine, setLineActive, updateLine } from '../lines/service';
+import { createLine, pauseLine, setLineActive, updateLine } from '../lines/service';
 import { STAGES } from '../pipeline/stages';
 import {
   BossQueue,
@@ -122,6 +122,19 @@ describe('syncSchedules', () => {
     });
     expect((await boss.getSchedules(TICK_QUEUE)).map((schedule) => schedule.cron)).toEqual([
       cronFor(7),
+    ]);
+  });
+
+  it('keeps the schedule of a line the system paused for its budget, not of one Hugo paused', async () => {
+    const capped = await createLine({ db, dataDir }, topicLineInput({ name: 'Capped' }));
+    await pauseLine(db, capped.id, 'reached its monthly cap');
+    const mine = await createLine({ db, dataDir }, productLineInput({ name: 'Mine' }));
+    await syncSchedules(boss, db);
+    await setLineActive(db, mine.id, false);
+    const result = await syncSchedules(boss, db);
+    expect(result).toEqual({ scheduled: [capped.id], removed: [mine.id] });
+    expect((await boss.getSchedules(TICK_QUEUE)).map((schedule) => schedule.key)).toEqual([
+      capped.id,
     ]);
   });
 });

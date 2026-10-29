@@ -129,12 +129,13 @@ export async function updateLine(
   return toLine(row);
 }
 
-/** Hugo pauses or resumes a line; resuming clears the reason the system paused it for */
+/** Hugo pauses or resumes a line; either way the reason the system paused it for is cleared */
 export async function setLineActive(db: Db, id: string, active: boolean): Promise<Line> {
   await getLine(db, id);
   const row = await db.productionLine.update({
     where: { id },
-    data: active ? { active, pausedReason: null, warning: null } : { active },
+    // Hugo's own pause carries no reason: only the system's pauses (cap) come back by themselves
+    data: active ? { active, pausedReason: null, warning: null } : { active, pausedReason: null },
   });
   return toLine(row);
 }

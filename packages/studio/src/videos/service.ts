@@ -1,4 +1,4 @@
-import type { Db, Video, VideoStatus } from '@dailies-crew/db';
+import type { Db, Tx, Video, VideoStatus } from '@dailies-crew/db';
 import { isUuid } from '../assets';
 import { roundUsd } from '../costs/math';
 import { monthRange, monthStart, zonedYearMonth } from '../costs/month';
@@ -62,6 +62,31 @@ export async function retryVideo(ctx: StudioContext, id: string): Promise<Video>
   });
 }
 
+type VideoWhere = NonNullable<Parameters<Tx['video']['findMany']>[0]>['where'];
+
+/**
+ * Queues again the videos matching `where` (they must be waiting: paused for a cap, or failed by a
+ * key or credit stop). The claim is guarded: a video someone else already moved is not queued twice.
+ */
+export async function requeueWaiting(
+  ctx: StudioContext,
+  tx: Tx,
+  where: VideoWhere,
+): Promise<number> {
+  const waiting = await tx.video.findMany({ where });
+  let videos = 0;
+  for (const video of waiting) {
+    const claimed = await tx.video.updateMany({
+      where: { AND: [{ id: video.id }, where ?? {}] },
+      data: { status: 'queued', failureKind: null, failureReason: null },
+    });
+    if (claimed.count === 0) continue;
+    await ctx.queue.enqueue(video.stage, video.id, tx);
+    videos += 1;
+  }
+  return videos;
+}
+
 /**
  * After fixing what stopped the studio (the API key, the credit, a spending cap): clears the
  * global warning, turns back on the lines the system paused, and queues again every video that
@@ -89,32 +114,13 @@ export async function resumeStudio(
       },
       data: { active: true, pausedReason: null, warning: null },
     });
-    const waiting = await tx.video.findMany({
-      where: {
-        ...ofLine,
-        OR: [
-          { status: 'paused_budget' },
-          { status: 'failed', failureKind: { in: RESUMABLE_FAILURES } },
-        ],
-      },
+    const videos = await requeueWaiting(ctx, tx, {
+      ...ofLine,
+      OR: [
+        { status: 'paused_budget' },
+        { status: 'failed', failureKind: { in: RESUMABLE_FAILURES } },
+      ],
     });
-    let videos = 0;
-    for (const video of waiting) {
-      // guarded: a video someone else already moved is not queued twice
-      const claimed = await tx.video.updateMany({
-        where: {
-          id: video.id,
-          OR: [
-            { status: 'paused_budget' },
-            { status: 'failed', failureKind: { in: RESUMABLE_FAILURES } },
-          ],
-        },
-        data: { status: 'queued', failureKind: null, failureReason: null },
-      });
-      if (claimed.count === 0) continue;
-      await ctx.queue.enqueue(video.stage, video.id, tx);
-      videos += 1;
-    }
     return { lines: lines.count, videos };
   });
   return { lines, videos };
@@ -173,4 +179,9 @@ export async function costsReport(db: Db, now: Date, yearMonth?: string) {
     })),
     roles: byRole.map((group) => ({ role: group.role, usd: roundUsd(group._sum.usd ?? 0) })),
   };
+}
+
+/** Queues again the videos of one line that stopped at its spending cap (once, no double jobs) */
+export async function requeueBudgetVideos(ctx: StudioContext, lineId: string): Promise<number> {
+  return ctx.db.$transaction((tx) => requeueWaiting(ctx, tx, { lineId, status: 'paused_budget' }));
 }

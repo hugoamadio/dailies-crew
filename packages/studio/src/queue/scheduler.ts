@@ -10,8 +10,8 @@ export function cronFor(hour: number): string {
 }
 
 /**
- * Makes pg-boss's schedules match the active lines: one daily tick per active line (keyed by the
- * line id), none for paused or missing lines. Runs at worker start and after any line change. A
+ * Makes pg-boss's schedules match the lines: one daily tick per active line and per line the
+ * system paused (keyed by the line id), none for lines Hugo paused or missing lines. Runs at worker start and after any line change. A
  * tick missed while the computer was off is sent once when the worker comes back.
  */
 export async function syncSchedules(
@@ -19,7 +19,10 @@ export async function syncSchedules(
   db: Db,
 ): Promise<{ scheduled: string[]; removed: string[] }> {
   const settings = await getSettings(db);
-  const active = (await listLines(db)).filter((line) => line.active);
+  const active = (await listLines(db)).filter(
+    // a line the system paused for its budget keeps its schedule: it comes back by itself
+    (line) => line.active || line.pausedReason !== null,
+  );
   for (const line of active) {
     const data: TickJobData = { lineId: line.id };
     await boss.schedule(TICK_QUEUE, cronFor(line.hour), data, {

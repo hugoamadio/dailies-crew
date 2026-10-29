@@ -93,4 +93,71 @@ describe('runLineTick', () => {
     );
     expect(await db.video.count()).toBe(1);
   });
+
+  describe('a line paused by the system for its budget', () => {
+    async function cappedInOctober() {
+      const october = new Date('2026-10-25T12:00:00Z');
+      const november = new Date('2026-11-02T12:00:00Z');
+      const line = await createLine(
+        { db, dataDir },
+        topicLineInput({ name: 'Capped', monthlyCapUsd: 1 }),
+      );
+      await db.costEntry.create({
+        data: { lineId: line.id, role: 'director', model: 'x', usd: 1.5, createdAt: october },
+      });
+      const video = await db.video.create({
+        data: { lineId: line.id, status: 'paused_budget', stage: 'script' },
+      });
+      await db.productionLine.update({
+        where: { id: line.id },
+        data: { active: false, pausedReason: 'Line "Capped" reached its monthly cap' },
+      });
+      return { line, video, october, november };
+    }
+
+    it('comes back at the first tick of the next month and queues its paused video once', async () => {
+      const { line, video, november } = await cappedInOctober();
+      const ctx = testContext(db, dataDir, { now: () => november });
+      const result = await runLineTick(ctx, line.id);
+      expect(result.created).toHaveLength(1);
+      const row = await db.productionLine.findUniqueOrThrow({ where: { id: line.id } });
+      expect(row).toMatchObject({ active: true, pausedReason: null, warning: null });
+      expect((await db.video.findUniqueOrThrow({ where: { id: video.id } })).status).toBe('queued');
+      expect(ctx.queue.jobs.filter((job) => job.videoId === video.id)).toEqual([
+        { stage: 'script', videoId: video.id },
+      ]);
+      // a second tick does not queue the paused video again
+      await runLineTick(ctx, line.id);
+      expect(ctx.queue.jobs.filter((job) => job.videoId === video.id)).toHaveLength(1);
+    });
+
+    it('stays paused while the cap is still reached', async () => {
+      const { line, video, october } = await cappedInOctober();
+      const ctx = testContext(db, dataDir, { now: () => october });
+      const result = await runLineTick(ctx, line.id);
+      expect(result.created).toEqual([]);
+      expect((await db.productionLine.findUniqueOrThrow({ where: { id: line.id } })).active).toBe(
+        false,
+      );
+      expect((await db.video.findUniqueOrThrow({ where: { id: video.id } })).status).toBe(
+        'paused_budget',
+      );
+      expect(ctx.queue.jobs).toEqual([]);
+    });
+
+    it('stays paused with a global warning, and a line Hugo paused never comes back', async () => {
+      const { line, november } = await cappedInOctober();
+      const ctx = testContext(db, dataDir, { now: () => november });
+      await db.settings.update({ where: { id: 1 }, data: { warning: 'key refused' } });
+      expect((await runLineTick(ctx, line.id)).created).toEqual([]);
+      await db.settings.update({ where: { id: 1 }, data: { warning: null } });
+
+      const mine = await createLine({ db, dataDir }, topicLineInput({ name: 'Mine' }));
+      await setLineActive(db, mine.id, false);
+      expect((await runLineTick(ctx, mine.id)).skipped).toBe('line "Mine" is paused');
+      expect((await db.productionLine.findUniqueOrThrow({ where: { id: mine.id } })).active).toBe(
+        false,
+      );
+    });
+  });
 });

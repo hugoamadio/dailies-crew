@@ -1,14 +1,31 @@
 import { checkBudget } from '../costs/service';
 import { getLine, pauseLine } from '../lines/service';
+import type { Line } from '../lines/schema';
 import { chooseMaterial } from '../material';
 import type { StudioContext } from '../pipeline/context';
 import { getSettings } from '../settings/service';
+import { requeueWaiting } from './service';
 
 export interface TickResult {
   /** Ids of the videos queued */
   created: string[];
   /** Why nothing was made */
   skipped?: string;
+}
+
+/** Turns the line back on and queues its budget-paused videos again (guarded: no double jobs) */
+async function liftBudgetPause(ctx: StudioContext, line: Line): Promise<void> {
+  const videos = await ctx.db.$transaction(async (tx) => {
+    const lifted = await tx.productionLine.updateMany({
+      where: { id: line.id, active: false, pausedReason: { not: null } },
+      data: { active: true, pausedReason: null, warning: null },
+    });
+    if (lifted.count === 0) return 0;
+    return requeueWaiting(ctx, tx, { lineId: line.id, status: 'paused_budget' });
+  });
+  ctx.log(
+    `[tick] line "${line.name}" is back on: its budget passes again; ${videos} videos queued`,
+  );
 }
 
 /**
@@ -30,10 +47,18 @@ export async function runLineTick(
     if (earlier.length > 0)
       return { created: [], skipped: 'this daily run already made its videos' };
   }
-  if (!line.active) return { created: [], skipped: `line "${line.name}" is paused` };
   const settings = await getSettings(ctx.db);
-  if (settings.warning) return { created: [], skipped: settings.warning };
   const now = ctx.now();
+  if (!line.active) {
+    // Hugo's pause stays; the system's budget pause lifts itself once the budget passes again
+    const lifted =
+      line.pausedReason && !settings.warning
+        ? (await checkBudget(ctx.db, settings, line, now)).ok
+        : false;
+    if (!lifted) return { created: [], skipped: `line "${line.name}" is paused` };
+    await liftBudgetPause(ctx, line);
+  }
+  if (settings.warning) return { created: [], skipped: settings.warning };
   const budget = await checkBudget(ctx.db, settings, line, now);
   if (!budget.ok) {
     await pauseLine(ctx.db, line.id, budget.reason);
