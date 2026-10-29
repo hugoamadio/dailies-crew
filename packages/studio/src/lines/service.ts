@@ -1,4 +1,5 @@
 import type { Db, LearnedRule, ProductionLine } from '@dailies-crew/db';
+import { z } from 'zod';
 import { ensureAsset, imageExtension, importAsset, isUuid } from '../assets';
 import { parseInput, StudioError } from '../errors';
 import { getSettings } from '../settings/service';
@@ -155,9 +156,30 @@ export async function listRules(db: Db, lineId: string): Promise<LearnedRule[]> 
   return db.learnedRule.findMany({ where: { lineId }, orderBy: { createdAt: 'asc' } });
 }
 
-/** Turns a learned rule off (or on again): the history keeps it */
-export async function setRuleActive(db: Db, ruleId: string, active: boolean): Promise<LearnedRule> {
+async function getRule(db: Db, ruleId: string): Promise<LearnedRule> {
   const rule = isUuid(ruleId) ? await db.learnedRule.findUnique({ where: { id: ruleId } }) : null;
   if (!rule) throw new StudioError(`No learned rule with id ${ruleId}`);
+  return rule;
+}
+
+/** Turns a learned rule off (or on again): the history keeps it */
+export async function setRuleActive(db: Db, ruleId: string, active: boolean): Promise<LearnedRule> {
+  await getRule(db, ruleId);
   return db.learnedRule.update({ where: { id: ruleId }, data: { active } });
+}
+
+/** The same limits the rejection router writes rules with */
+export const RuleTextSchema = z.string().trim().min(3).max(200);
+
+/** Hugo rewrites a learned rule (spec section 3: rules can be seen, edited and deleted) */
+export async function updateRuleText(db: Db, ruleId: string, text: unknown): Promise<LearnedRule> {
+  const clean = parseInput(RuleTextSchema, text, 'rule');
+  await getRule(db, ruleId);
+  return db.learnedRule.update({ where: { id: ruleId }, data: { text: clean } });
+}
+
+/** Deletes a learned rule for good; the rejection that taught it stays in the video's history */
+export async function deleteRule(db: Db, ruleId: string): Promise<void> {
+  await getRule(db, ruleId);
+  await db.learnedRule.delete({ where: { id: ruleId } });
 }

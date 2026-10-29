@@ -1,3 +1,4 @@
+import { type Db, Prisma } from '@dailies-crew/db';
 import { resetDb, testDb } from '@dailies-crew/db/test';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from './defaults';
@@ -17,6 +18,24 @@ describe('settings service', () => {
     expect(settings).toMatchObject(DEFAULT_SETTINGS);
     expect(settings.warning).toBeNull();
     expect(await db.settings.count()).toBe(1);
+  });
+
+  it('reads the row another process just created when its own create loses the race', async () => {
+    await getSettings(db);
+    // as if a second process had created the row between this upsert's read and its insert
+    const racing = {
+      settings: {
+        upsert: () =>
+          Promise.reject(
+            new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+              code: 'P2002',
+              clientVersion: 'test',
+            }),
+          ),
+        findUniqueOrThrow: (args: { where: { id: number } }) => db.settings.findUniqueOrThrow(args),
+      },
+    } as unknown as Db;
+    expect(await getSettings(racing)).toMatchObject(DEFAULT_SETTINGS);
   });
 
   it('merges a patch role by role and price by price', async () => {

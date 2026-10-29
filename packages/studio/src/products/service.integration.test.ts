@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LAMP_SVG, productInput, productLineInput, tempDataDir } from '../../test/fixtures';
 import { createLine } from '../lines/service';
 import { chooseMaterial } from '../material';
-import { createProduct, listProducts, setProductActive } from './service';
+import { createProduct, listProducts, setProductActive, updateProduct } from './service';
 
 const db = testDb();
 let dataDir: string;
@@ -44,6 +44,39 @@ describe('product service', () => {
       createProduct({ db, dataDir }, productInput({ oldPriceCents: 100 }), [LAMP_SVG]),
     ).rejects.toThrow('oldPriceCents must be higher than priceCents');
     expect(await listProducts(db)).toEqual([]);
+  });
+});
+
+describe('updateProduct', () => {
+  it('changes the given fields and keeps the rest, checking the prices together', async () => {
+    const product = await createProduct({ db, dataDir }, productInput(), [LAMP_SVG]);
+    const updated = await updateProduct({ db, dataDir }, product.id, {
+      name: 'Luminária Sol',
+      priceCents: 7990,
+      category: null,
+    });
+    expect(updated).toMatchObject({
+      name: 'Luminária Sol',
+      priceCents: 7990,
+      oldPriceCents: 12990,
+      category: null,
+      images: product.images,
+    });
+    await expect(updateProduct({ db, dataDir }, product.id, { priceCents: 20000 })).rejects.toThrow(
+      'oldPriceCents must be higher than priceCents',
+    );
+    await expect(updateProduct({ db, dataDir }, product.id, { active: false })).rejects.toThrow(
+      'Invalid product changes',
+    );
+  });
+
+  it('replaces the photos with new ones numbered after the old, leaving the old files', async () => {
+    const product = await createProduct({ db, dataDir }, productInput(), [LAMP_SVG, LAMP_SVG]);
+    const updated = await updateProduct({ db, dataDir }, product.id, {}, [LAMP_SVG]);
+    expect(updated.images).toEqual([`products/${product.id}/3-lamp.svg`]);
+    for (const image of [...product.images, ...updated.images]) {
+      await expect(fs.access(path.join(dataDir, 'assets', image))).resolves.toBeUndefined();
+    }
   });
 });
 

@@ -9,6 +9,7 @@ import {
   type LlmClient,
   StudioError,
   type StudioContext,
+  WORKER_APPLICATION_NAME,
 } from '@dailies-crew/studio';
 import { PgBoss } from 'pg-boss';
 import { workerEnv } from './env';
@@ -84,7 +85,7 @@ export async function createRuntime(
     if (options.queue) {
       boss = new PgBoss({
         connectionString: databaseUrl,
-        application_name: options.worker ? 'dailies-worker' : 'dailies-cli',
+        application_name: options.worker ? WORKER_APPLICATION_NAME : 'dailies-cli',
         supervise: options.worker,
         schedule: options.worker,
         ...(options.bossSchema ? { schema: options.bossSchema } : {}),

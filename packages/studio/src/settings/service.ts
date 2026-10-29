@@ -1,4 +1,4 @@
-import type { Db, Settings } from '@dailies-crew/db';
+import { type Db, Prisma, type Settings } from '@dailies-crew/db';
 import { parseInput } from '../errors';
 import { DEFAULT_SETTINGS } from './defaults';
 import {
@@ -20,13 +20,21 @@ function fromRow(row: Settings): StudioSettings {
   return { ...values, warning: row.warning, warningAt: row.warningAt };
 }
 
-/** The settings row, created with the defaults on first use */
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+/**
+ * The settings row, created with the defaults on first use. Two first reads at once (the panel
+ * loads a page and its layout together) both try to create it: the loser reads the winner's row.
+ */
 export async function getSettings(db: Db): Promise<StudioSettings> {
-  const row = await db.settings.upsert({
-    where: { id: 1 },
-    create: { id: 1, ...DEFAULT_SETTINGS },
-    update: {},
-  });
+  const row = await db.settings
+    .upsert({ where: { id: 1 }, create: { id: 1, ...DEFAULT_SETTINGS }, update: {} })
+    .catch((error: unknown) => {
+      if (isUniqueViolation(error)) return db.settings.findUniqueOrThrow({ where: { id: 1 } });
+      throw error;
+    });
   return fromRow(row);
 }
 

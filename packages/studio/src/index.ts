@@ -37,6 +37,7 @@ export * from './products/service';
 export * from './queue/boss';
 export * from './queue/scheduler';
 export * from './queue/sweep';
+export * from './queue/worker-state';
 export * from './roles';
 export * from './settings/defaults';
 export * from './settings/schema';

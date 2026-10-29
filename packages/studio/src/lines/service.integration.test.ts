@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LOGO_SVG, productLineInput, tempDataDir, topicLineInput } from '../../test/fixtures';
 import {
   createLine,
+  deleteRule,
   getLine,
   listLines,
   listRules,
@@ -12,6 +13,7 @@ import {
   setLineActive,
   setRuleActive,
   updateLine,
+  updateRuleText,
 } from './service';
 
 const db = testDb();
@@ -103,6 +105,20 @@ describe('line service', () => {
     ]);
     expect((await setRuleActive(db, rule.id, false)).active).toBe(false);
     await expect(setRuleActive(db, 'nope', false)).rejects.toThrow('No learned rule with id nope');
+  });
+
+  it('rewrites a rule and deletes one, refusing an empty text', async () => {
+    const line = await createLine({ db, dataDir }, topicLineInput());
+    const rule = await db.learnedRule.create({
+      data: { lineId: line.id, text: 'Never show the price first' },
+    });
+    expect((await updateRuleText(db, rule.id, '  Show the price last  ')).text).toBe(
+      'Show the price last',
+    );
+    await expect(updateRuleText(db, rule.id, ' ')).rejects.toThrow('Invalid rule');
+    await deleteRule(db, rule.id);
+    expect(await listRules(db, line.id)).toEqual([]);
+    await expect(deleteRule(db, rule.id)).rejects.toThrow(`No learned rule with id ${rule.id}`);
   });
 
   it('answers a clear message for an unknown or malformed id', async () => {

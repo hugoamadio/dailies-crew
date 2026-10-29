@@ -21,12 +21,36 @@ function zoneOffsetMs(date: Date, timeZone: string): number {
   return wallClock - Math.floor(date.getTime() / 1000) * 1000;
 }
 
-/** The instant the wall clock of the zone shows midnight of the first day of that month */
-export function zonedMonthStart(year: number, month: number, timeZone: string): Date {
-  const guess = Date.UTC(year, month - 1, 1);
+/** The instant the wall clock of the zone shows that day and hour (day and hour may overflow) */
+export function zonedWallTime(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  timeZone: string,
+): Date {
+  const guess = Date.UTC(year, month - 1, day, hour);
   const first = guess - zoneOffsetMs(new Date(guess), timeZone);
   // once more, in case the offset changed between the guess and the answer (daylight saving)
   return new Date(guess - zoneOffsetMs(new Date(first), timeZone));
+}
+
+/** The instant the wall clock of the zone shows midnight of the first day of that month */
+export function zonedMonthStart(year: number, month: number, timeZone: string): Date {
+  return zonedWallTime(year, month, 1, 0, timeZone);
+}
+
+/** Midnight of the day the zone's calendar shows at that instant ("today" on the panel) */
+export function zonedDayStart(now: Date, timeZone: string): Date {
+  const p = zonedParts(now, timeZone);
+  return zonedWallTime(p.year!, p.month!, p.day!, 0, timeZone);
+}
+
+/** The next time a line that runs daily at `hour` (minute 0, in the zone) starts after `now` */
+export function nextDailyRun(hour: number, timeZone: string, now: Date): Date {
+  const p = zonedParts(now, timeZone);
+  const today = zonedWallTime(p.year!, p.month!, p.day!, hour, timeZone);
+  return today > now ? today : zonedWallTime(p.year!, p.month!, p.day! + 1, hour, timeZone);
 }
 
 /** Year and month (1-12) the zone's calendar shows at that instant */
