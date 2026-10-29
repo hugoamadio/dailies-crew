@@ -8,6 +8,7 @@ import { drain, testContext } from '../../../test/studio';
 import { MAX_REVIEW_ROUNDS } from '../../crew/reviewer';
 import { runStage } from '../runner';
 import { createFakeLlm } from '../../crew/fake';
+import { LlmError } from '../../llm/errors';
 import { createLine } from '../../lines/service';
 import { createProduct } from '../../products/service';
 import { STAGES } from '../stages';
@@ -105,6 +106,25 @@ describe('the stages together', () => {
       round: 2,
       problems: ['script: (art) Open with the price'],
     });
+    // the video handed to Hugo comes with its post texts and its render
+    const handed = await db.video.findUniqueOrThrow({ where: { id: video.id } });
+    expect(handed.social).toMatchObject({ tiktok: { hashtags: ['#luminaria', '#lua'] } });
+    expect(handed.videoFile).not.toBeNull();
+  });
+
+  it('still hand the video to Hugo when its post texts cannot be written', async () => {
+    const round = [adjust, approve, approve];
+    const llm = createFakeLlm()
+      .script('reviewer', ...round, ...round, ...round)
+      .script('social', new LlmError('invalid_output', 'bad texts', false));
+    const ctx = testContext(db, dataDir, { llm });
+    const video = await productVideo();
+    await ctx.queue.enqueue('prepare', video.id);
+    await drain(ctx, STAGE_HANDLERS);
+
+    const handed = await db.video.findUniqueOrThrow({ where: { id: video.id } });
+    expect(handed).toMatchObject({ status: 'needs_you', social: null });
+    expect(ctx.logs.some((line) => line.includes('no post texts'))).toBe(true);
   });
 
   it('hand the video to Hugo when the director fails three times, with every attempt kept', async () => {

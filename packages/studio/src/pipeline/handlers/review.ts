@@ -10,6 +10,7 @@ import {
   type ReviewFocus,
   sampleEvenly,
 } from '../../crew/reviewer';
+import { buildSocialRequest, type SocialPosts } from '../../crew/social';
 import type { StageHandler } from '../handler';
 import { chosenIdeaOf, latestOutput, scriptOf } from '../inputs';
 import { json } from '../json';
@@ -61,8 +62,27 @@ export const review: StageHandler = async (ctx, run) => {
   const [rhythm, fidelity] = await allSettledOrThrow([ask('rhythm'), ask('fidelity')]);
   const verdicts: Record<ReviewFocus, Review> = { art, rhythm, fidelity };
   const decision = decideReview(verdicts, run.video.reviewRounds);
+  // a video handed to Hugo skips the social stage, so its post texts are written here
+  let social: SocialPosts | null = null;
+  if (decision.kind === 'needs_you' && run.video.videoFile) {
+    try {
+      social = await run.call(
+        buildSocialRequest(
+          { recipe: run.recipe, rules: run.rules, material: run.material, idea, script },
+          run.settings.roles.social,
+        ),
+      );
+    } catch (error) {
+      ctx.log(
+        `[review] ${run.video.id}: no post texts for the video handed to Hugo: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
   const persist = (tx: Tx) =>
-    tx.video.update({ where: { id: run.video.id }, data: { review: json(verdicts) } });
+    tx.video.update({
+      where: { id: run.video.id },
+      data: { review: json(verdicts), ...(social ? { social: json(social) } : {}) },
+    });
   const input = { frames: frames.length, reviewRoundsUsed: run.video.reviewRounds };
   if (decision.kind === 'approve')
     return { outcome: { kind: 'next' }, input, output: verdicts, persist };
