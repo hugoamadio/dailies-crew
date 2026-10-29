@@ -114,6 +114,39 @@ costs are in the settings (`npm run crew -- settings`); check them against the c
 ElevenLabs prices. If the key is refused or the credit runs out, every line stops and
 `npm run crew -- status` says why: fix it, then run `npm run crew -- resume`.
 
+## The panel
+
+The panel is a web app for one person on this machine: it answers only on `127.0.0.1`, has no
+login, and refuses any request whose host is not `127.0.0.1` or `localhost`. In English and
+Portuguese. Next.js telemetry is turned off in every script.
+
+```bash
+npm run worker           # in one terminal: the panel never makes videos itself
+npm run web              # in another: http://127.0.0.1:3300
+```
+
+The worker is a separate process: the panel only queues jobs, so without the worker nothing gets
+made (the sidebar says so). The `.env` keys behave as in the studio: with `DAILIES_FAKE_AI=1`
+everything is free and offline.
+
+- **Today**: what is in production, ready for review, waiting for you or failed (with "Try
+  again"), this month's spending against the caps, and the next daily runs.
+- **Lines**: turn lines on and off, "Run now", create and edit them (logo upload), and see, edit,
+  turn off or delete the rules learned from your rejections.
+- **Products**: photos, prices, categories; turn products on and off.
+- **Videos**: the review queue and every video. The review page plays the video in a phone frame,
+  shows the post texts of each network with copy buttons, and lets you approve, reject (redo or
+  learn only) and download. "Behind the scenes" shows the whole history: briefing, ideas and the
+  committee's notes, script, plan, review rounds and frames, your decisions and the cost of each
+  stage.
+- **Settings**: whether the keys are configured (and a "Check keys" button that calls each
+  provider's free endpoint), the default hour, the time zone, the global cap, the model and effort
+  of each crew role, and the prices used for the costs.
+
+Pages with work in progress refresh themselves every few seconds. For a production build:
+`npm run web:build`, then `npm run web:start` (same port). Job folders under `data/jobs` are not
+cleaned yet (about 6.5 MB per fake video).
+
 ## Tests
 
 ```bash
@@ -121,7 +154,14 @@ npm test                  # unit tests, no database
 npm run test:integration  # against Postgres (npm run db:up first; uses the dailies_test database)
 npm run test:visual       # renders frames and compares them with reference images
 npm run test:e2e          # renders the example video end to end
+npm run test:web          # the panel in a real browser (builds it; uses dailies_test, port 3310)
 ```
+
+`npm run test:web` and `npm run test:integration` share the `dailies_test` database: never run them
+at the same time. `npm run test:web` drives the panel with [Playwright](https://playwright.dev)'s
+own headless Chromium. Install that browser once with `npx playwright install --only-shell chromium`;
+Playwright keeps its browsers in `~/.cache/ms-playwright` (Linux), or in the folder
+`PLAYWRIGHT_BROWSERS_PATH` names.
 
 ## License
 
