@@ -14,6 +14,8 @@ import {
   TICK_QUEUE,
 } from './boss';
 import { cronFor, syncSchedules } from './scheduler';
+import { sweepStuckVideos } from './sweep';
+import { testContext } from '../../test/studio';
 
 const db = testDb();
 const boss = new PgBoss({
@@ -136,5 +138,68 @@ describe('syncSchedules', () => {
     expect((await boss.getSchedules(TICK_QUEUE)).map((schedule) => schedule.key)).toEqual([
       capped.id,
     ]);
+  });
+});
+
+describe('sweepStuckVideos', () => {
+  async function video(data: Record<string, unknown>) {
+    const line = await createLine({ db, dataDir }, topicLineInput());
+    return db.video.create({ data: { lineId: line.id, ...data } });
+  }
+
+  it('fails a video with no live job, so "crew retry" can free it', async () => {
+    const ctx = testContext(db, dataDir, { queue: new BossQueue(boss) });
+    const stuck = await video({ status: 'running', stage: 'produce' });
+    const result = await sweepStuckVideos(ctx, boss);
+    expect(result).toEqual({ requeued: [], failed: [stuck.id] });
+    expect(await db.video.findUniqueOrThrow({ where: { id: stuck.id } })).toMatchObject({
+      status: 'failed',
+      failureKind: 'interrupted',
+    });
+  });
+
+  it('queues the stage again when it was done but its result was never applied', async () => {
+    const ctx = testContext(db, dataDir, { queue: new BossQueue(boss) });
+    const stuck = await video({ status: 'running', stage: 'script', round: 1 });
+    await db.stageRun.create({
+      data: {
+        videoId: stuck.id,
+        stage: 'script',
+        round: 1,
+        attempt: 1,
+        status: 'done',
+        output: { outcome: { kind: 'next' } },
+      },
+    });
+    const result = await sweepStuckVideos(ctx, boss);
+    expect(result).toEqual({ requeued: [stuck.id], failed: [] });
+    expect((await boss.findJobs(STAGE_QUEUES.script)).map((job) => job.data)).toEqual([
+      { videoId: stuck.id },
+    ]);
+    expect((await db.video.findUniqueOrThrow({ where: { id: stuck.id } })).status).toBe('running');
+    // the job it queued is alive: a second sweep leaves it alone
+    expect(await sweepStuckVideos(ctx, boss)).toEqual({ requeued: [], failed: [] });
+  });
+
+  it('leaves alone a video with a waiting or running job, and those not in production', async () => {
+    const ctx = testContext(db, dataDir, { queue: new BossQueue(boss) });
+    const waiting = await video({ status: 'queued', stage: 'prepare' });
+    await new BossQueue(boss).enqueue('prepare', waiting.id);
+    const active = await video({ status: 'running', stage: 'ideas' });
+    await new BossQueue(boss).enqueue('ideas', active.id);
+    const fetched = await boss.fetch(STAGE_QUEUES.ideas);
+    expect(fetched).toHaveLength(1);
+    const failed = await video({ status: 'failed', stage: 'produce' });
+    const ready = await video({ status: 'ready_for_review', stage: 'social' });
+
+    expect(await sweepStuckVideos(ctx, boss)).toEqual({ requeued: [], failed: [] });
+    for (const [each, status] of [
+      [waiting, 'queued'],
+      [active, 'running'],
+      [failed, 'failed'],
+      [ready, 'ready_for_review'],
+    ] as const) {
+      expect((await db.video.findUniqueOrThrow({ where: { id: each.id } })).status).toBe(status);
+    }
   });
 });

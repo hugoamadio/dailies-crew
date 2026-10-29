@@ -1,4 +1,4 @@
-import { STAGE_HANDLERS, startWorkers, syncSchedules } from '@dailies-crew/studio';
+import { STAGE_HANDLERS, startSweeper, startWorkers, syncSchedules } from '@dailies-crew/studio';
 import { loadEnv, workerEnv } from './env';
 import { createRuntime } from './runtime';
 
@@ -12,6 +12,7 @@ async function main(): Promise<void> {
   const runtime = await createRuntime(process.env, { queue: true, worker: true });
   const boss = runtime.boss!;
   await startWorkers(boss, runtime.ctx, STAGE_HANDLERS, { concurrency });
+  const stopSweeper = startSweeper(runtime.ctx, boss);
   const { scheduled } = await syncSchedules(boss, runtime.db);
   const ai = runtime.ctx.llm.name === 'fake' ? 'the fake AI (DAILIES_FAKE_AI=1)' : 'Claude';
   console.log(
@@ -22,6 +23,7 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     console.log(`${signal}: finishing the jobs in progress (up to 60 s)...`);
+    stopSweeper();
     try {
       await runtime.close();
     } catch (error) {
