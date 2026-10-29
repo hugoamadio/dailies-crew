@@ -27,7 +27,10 @@
     "db:migrate": "prisma migrate dev --config packages/db/prisma7.config.ts",
     "db:deploy": "prisma migrate deploy --config packages/db/prisma7.config.ts",
     "worker": "tsx apps/worker/src/main.ts",
-    "crew": "tsx apps/worker/src/crew.ts"
+    "crew": "tsx apps/worker/src/crew.ts",
+    "web": "NEXT_TELEMETRY_DISABLED=1 next dev apps/web -H 127.0.0.1 -p 3300",
+    "web:build": "NEXT_TELEMETRY_DISABLED=1 next build apps/web",
+    "web:start": "NEXT_TELEMETRY_DISABLED=1 next start apps/web -H 127.0.0.1 -p 3300"
   },
   "devDependencies": {
     "@remotion/cli": "4.0.534",

@@ -5,3 +5,5 @@ data
 out
 packages/scenes/test/__snapshots__
 packages/scenes/test/__bundle__
+.next
+.next-e2e

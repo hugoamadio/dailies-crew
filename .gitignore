@@ -7,3 +7,8 @@ packages/scenes/test/__actual__/
 packages/scenes/test/__bundle__/
 .env
 packages/db/src/generated/
+.next/
+next-env.d.ts
+test-results/
+playwright-report/
+.next-e2e/
