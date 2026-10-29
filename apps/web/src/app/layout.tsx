@@ -1,3 +1,4 @@
+import { StudioError } from '@dailies-crew/studio';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { DatabaseDown, Shell } from '../components/shell';
@@ -22,22 +23,25 @@ export const dynamic = 'force-dynamic';
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const { locale, t } = await getI18n();
-  const reachable = await getPanel().then(
-    () => true,
+  // null: the panel started; otherwise why not ('' = the database cannot be reached)
+  const failure = await getPanel().then(
+    () => null,
     (error: unknown) => {
       console.error(error);
-      return false;
+      // a StudioError is written for the person (e.g. DATABASE_URL missing); anything else is a
+      // connection failure, whose raw text is not shown
+      return error instanceof StudioError ? error.message : '';
     },
   );
   return (
     <html lang={locale}>
       <body className="min-h-dvh font-sans antialiased">
-        {reachable ? (
+        {failure === null ? (
           <Shell locale={locale} t={t}>
             {children}
           </Shell>
         ) : (
-          <DatabaseDown t={t} />
+          <DatabaseDown t={t} message={failure || undefined} />
         )}
       </body>
     </html>

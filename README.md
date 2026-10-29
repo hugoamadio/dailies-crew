@@ -122,8 +122,12 @@ Portuguese. Next.js telemetry is turned off in every web script.
 
 ```bash
 npm run worker           # in one terminal: the panel never makes videos itself
-npm run web              # in another: http://127.0.0.1:3300
+npm run web:build        # once, and again after each update of the code
+npm run web:start        # in another: http://127.0.0.1:3300
 ```
+
+Use `web:build` + `web:start` for daily use. `npm run web` (the development server, same address)
+is for changing the panel: it keeps a `.next` cache that keeps growing, and disk is limited.
 
 The worker is a separate process: the panel only queues jobs, so without the worker nothing gets
 made (the sidebar says so). With `DAILIES_FAKE_AI=1` the crews' AI calls are fake and cost nothing.

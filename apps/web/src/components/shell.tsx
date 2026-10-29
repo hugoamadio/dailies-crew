@@ -54,11 +54,16 @@ function LanguageSwitch({ locale, label }: { locale: Locale; label: string }) {
 }
 
 /** The database is down: say how to start it instead of failing every page */
-export function DatabaseDown({ t }: { t: Dictionary }) {
+export function DatabaseDown({ t, message }: { t: Dictionary; message?: string }) {
+  // a message is a StudioError's own text (e.g. DATABASE_URL missing); without one the database is down
   return (
     <main className="mx-auto max-w-lg px-4 py-24 text-center">
-      <h1 className="text-xl font-semibold">{t.shell.dbDownTitle}</h1>
-      <p className="mt-3 text-muted">{withCommand(t.shell.dbDownBody, 'npm run db:up')}</p>
+      <h1 className="text-xl font-semibold">
+        {message ? t.shell.startFailedTitle : t.shell.dbDownTitle}
+      </h1>
+      <p className="mt-3 text-muted">
+        {message ?? withCommand(t.shell.dbDownBody, 'npm run db:up')}
+      </p>
     </main>
   );
 }

@@ -16,7 +16,9 @@ export async function saveSettingsAction(
 export async function checkKeysAction(): Promise<Record<KeyName, KeyCheck>> {
   try {
     return await checkKeys((await getPanel()).env);
-  } catch {
+  } catch (error) {
+    // only a panel start failure gets here (no key is involved)
+    console.error(error);
     // the page shows "could not check" instead of the error boundary
     const failed: KeyCheck = { state: 'error' };
     return { anthropic: failed, elevenlabs: failed };
