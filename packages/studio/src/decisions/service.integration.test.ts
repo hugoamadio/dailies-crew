@@ -77,6 +77,16 @@ describe('approveVideo', () => {
     expect((await db.video.findUniqueOrThrow({ where: { id: other.id } })).status).toBe('running');
   });
 
+  it('refuses a needs-you video that has no render', async () => {
+    const ctx = testContext(db, dataDir);
+    const video = await readyVideo('needs_you');
+    await db.video.update({ where: { id: video.id }, data: { videoFile: null } });
+    await expect(approveVideo(ctx, video.id)).rejects.toThrow('no finished video to approve');
+    expect((await db.video.findUniqueOrThrow({ where: { id: video.id } })).status).toBe(
+      'needs_you',
+    );
+  });
+
   it('refuses a video still in production', async () => {
     const ctx = testContext(db, dataDir);
     const video = await readyVideo('running');
@@ -146,6 +156,34 @@ describe('rejectVideo', () => {
       mode: 'redo',
       targetStage: 'produce',
     });
+  });
+
+  it('redo: drops the render of the round before, and the plan when it restarts at script', async () => {
+    const ctx = testContext(db, dataDir);
+    const first = await readyVideo();
+    await db.video.update({
+      where: { id: first.id },
+      data: { frameFiles: ['jobs/x/a.jpeg'], durationSeconds: 9, social: { tiktok: {} } },
+    });
+    await rejectVideo(ctx, first.id, {
+      reason: 'A voz ficou robótica',
+      mode: 'redo',
+      targetStage: 'produce',
+    });
+    expect(await db.video.findUniqueOrThrow({ where: { id: first.id } })).toMatchObject({
+      videoFile: null,
+      frameFiles: [],
+      durationSeconds: null,
+      social: null,
+      plan: { version: 1 },
+    });
+    const second = await readyVideo();
+    await rejectVideo(ctx, second.id, {
+      reason: 'Roteiro fraco',
+      mode: 'redo',
+      targetStage: 'script',
+    });
+    expect((await db.video.findUniqueOrThrow({ where: { id: second.id } })).plan).toBeNull();
   });
 
   it('redo: the router picks the stage when Hugo does not', async () => {

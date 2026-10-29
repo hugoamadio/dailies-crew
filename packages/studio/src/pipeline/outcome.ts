@@ -1,4 +1,4 @@
-import type { Stage, Tx } from '@dailies-crew/db';
+import { Prisma, type Stage, type Tx } from '@dailies-crew/db';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Instruction, ReworkStage } from '../crew/context';
@@ -25,6 +25,21 @@ export async function forgetVoice(dataDir: string, videoId: string): Promise<voi
   const dir = jobDir(dataDir, videoId);
   await fs.rm(path.join(dir, 'voice-cache.json'), { force: true });
   await fs.rm(path.join(dir, 'voice-cache'), { recursive: true, force: true });
+}
+
+/**
+ * What a new round (a rework or Hugo's redo) must not keep from the one before: the render, its
+ * frames and length, and the post texts. A round that starts at "script" also drops the plan. The
+ * files on disk stay; the video just stops pointing at them.
+ */
+export function clearedOutputs(from: Stage) {
+  return {
+    videoFile: null,
+    frameFiles: [] as string[],
+    durationSeconds: null,
+    social: Prisma.DbNull,
+    ...(from === 'script' ? { plan: Prisma.DbNull } : {}),
+  };
 }
 
 /**
@@ -62,6 +77,7 @@ export async function applyOutcome(
           reviewRounds: { increment: 1 },
           instructions: json(outcome.instructions),
           status: 'running',
+          ...clearedOutputs(outcome.from),
         },
       });
       if (updated.count === 0) return null;

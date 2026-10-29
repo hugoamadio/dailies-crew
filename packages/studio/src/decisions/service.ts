@@ -7,7 +7,7 @@ import { parseInput, StudioError } from '../errors';
 import { getLine } from '../lines/service';
 import type { StudioContext } from '../pipeline/context';
 import { json } from '../pipeline/json';
-import { forgetVoice } from '../pipeline/outcome';
+import { clearedOutputs, forgetVoice } from '../pipeline/outcome';
 import { getSettings } from '../settings/service';
 import { getVideo } from '../videos/service';
 import { manualOutput, type OutputAdapter } from './output';
@@ -48,7 +48,9 @@ export async function approveVideo(
   const video = await getVideo(ctx.db, videoId);
   ensureDecidable(video);
   if (!video.videoFile) {
-    throw new StudioError(`Video ${videoId} has no rendered file; reject it with "redo" instead`);
+    throw new StudioError(
+      `Video ${videoId} has no finished video to approve: redo it or reject it`,
+    );
   }
   const now = ctx.now();
   return ctx.db.$transaction(async (tx) => {
@@ -177,6 +179,7 @@ export async function rejectVideo(
         reviewRounds: 0,
         instructions: json([{ stage, instruction, source: 'hugo' }]),
         problems: [],
+        ...clearedOutputs(stage),
         readyAt: null,
         failureKind: null,
         failureReason: null,

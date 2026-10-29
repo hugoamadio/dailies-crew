@@ -270,6 +270,39 @@ describe('runStage', () => {
     await expect(fs.access(voiceCache)).rejects.toThrow();
   });
 
+  it('a rework drops the render and post texts of the round before, and the plan when it starts at script', async () => {
+    const ctx = testContext(db, dataDir);
+    async function reworkFrom(from: 'produce' | 'script') {
+      const video = await topicVideo({
+        stage: 'review',
+        status: 'running',
+        videoFile: 'jobs/x/video.mp4',
+        frameFiles: ['jobs/x/frames/a.jpeg'],
+        durationSeconds: 12.5,
+        social: { tiktok: {} },
+        plan: { version: 1 },
+      });
+      const rework: StageHandler = async (): Promise<StageResult> => ({
+        outcome: {
+          kind: 'rework',
+          from,
+          instructions: [{ stage: from, instruction: 'Change it', source: 'review' }],
+        },
+        output: {},
+      });
+      await runStage(ctx, 'review', job(video.id), handlers({ review: rework }));
+      return db.video.findUniqueOrThrow({ where: { id: video.id } });
+    }
+    expect(await reworkFrom('produce')).toMatchObject({
+      videoFile: null,
+      frameFiles: [],
+      durationSeconds: null,
+      social: null,
+      plan: { version: 1 },
+    });
+    expect(await reworkFrom('script')).toMatchObject({ videoFile: null, plan: null });
+  });
+
   it('forgets the voice when a rework from an earlier stage also asks for a new take', async () => {
     const ctx = testContext(db, dataDir);
     async function reworkFromScript(items: Omit<Instruction, 'source'>[]) {
