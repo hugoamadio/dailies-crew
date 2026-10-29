@@ -35,4 +35,19 @@ describe('runCli', () => {
     expect(err.at(-1)).toBe(USAGE);
     expect(open).not.toHaveBeenCalled();
   });
+
+  it('prints one line and exits 1 when closing fails after a successful command', async () => {
+    const { io, out, err } = capture();
+    const runtime = {
+      db: { productionLine: { findMany: async () => [] } },
+      ctx: {},
+      boss: null,
+      close: async () => {
+        throw new Error('the queue did not stop');
+      },
+    };
+    expect(await runCli(['line:list'], io, {}, async () => runtime as never)).toBe(1);
+    expect(out[0]).toContain('No lines yet');
+    expect(err).toEqual(['Could not close cleanly: the queue did not stop']);
+  });
 });

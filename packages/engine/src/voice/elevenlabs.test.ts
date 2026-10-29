@@ -119,4 +119,31 @@ describe('ElevenLabsVoiceProvider', () => {
       provider.synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' }),
     ).rejects.toThrow('ElevenLabs sent no timing for the voice');
   });
+
+  it('refuses a malformed alignment with a plain, non-retryable error', async () => {
+    for (const alignment of [
+      {},
+      { characters: ['O', 'i'] },
+      {
+        characters: ['O', 'i'],
+        character_start_times_seconds: [0],
+        character_end_times_seconds: [1],
+      },
+      {
+        characters: 'Oi',
+        character_start_times_seconds: [0, 1],
+        character_end_times_seconds: [1, 2],
+      },
+    ]) {
+      const provider = new ElevenLabsVoiceProvider({
+        apiKey: KEY,
+        fetch: respond(200, { audio_base64: okBody.audio_base64, alignment }),
+      });
+      const error = await provider
+        .synthesize({ text: 'Oi', voiceId: 'v', language: 'pt-BR' })
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(VoiceProviderError);
+      expect(error).toMatchObject({ retryable: false });
+    }
+  });
 });

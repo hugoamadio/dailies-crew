@@ -122,6 +122,42 @@ describe('the crew CLI', () => {
     expect((await crew(['approve', second.id])).err).toContain('is running');
   });
 
+  it('shows the post texts of a video with each network description, and resumes a line with its waiting videos', async () => {
+    const line = await db.productionLine.create({
+      data: {
+        name: 'L',
+        kind: 'topic',
+        material: { subject: 'Tips for 3D printing' },
+        perDay: 1,
+        hour: 9,
+        language: 'pt-BR',
+        objective: 'teach',
+        audience: 'makers',
+        tone: 'calm',
+        brand: productLineInput().brand,
+        voiceProvider: 'fake',
+        voiceId: 'demo',
+        monthlyCapUsd: 10,
+        active: false,
+        pausedReason: 'reached its monthly cap',
+      },
+    });
+    const post = { title: 'T', description: 'A long description', hashtags: ['#a'] };
+    const video = await db.video.create({
+      data: {
+        lineId: line.id,
+        status: 'paused_budget',
+        stage: 'script',
+        social: { youtube: post, tiktok: post, instagram: post, facebook: post },
+      },
+    });
+    expect((await crew(['show', video.id])).out).toContain('  A long description');
+    const resumed = await crew(['line:resume', line.id]);
+    expect(resumed.out).toContain('1 videos that waited for the cap were queued again.');
+    expect((await db.video.findUniqueOrThrow({ where: { id: video.id } })).status).toBe('queued');
+    expect(ctx.queue.jobs).toEqual([{ stage: 'script', videoId: video.id }]);
+  });
+
   it('changes the settings and reports the keys without showing them', async () => {
     const file = await writeJson('settings.json', { globalMonthlyCapUsd: 25 });
     expect((await crew(['settings:set', '--file', file])).out).toBe('Settings saved.');

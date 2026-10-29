@@ -88,8 +88,16 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
       );
     }
     const alignment = body?.alignment;
-    if (!body?.audio_base64 || !alignment || alignment.characters.length === 0) {
+    if (!body?.audio_base64 || !alignment || alignment.characters?.length === 0) {
       throw new VoiceProviderError('ElevenLabs sent no timing for the voice');
+    }
+    const lists = [
+      alignment.characters,
+      alignment.character_start_times_seconds,
+      alignment.character_end_times_seconds,
+    ];
+    if (!lists.every((list) => Array.isArray(list) && list.length === lists[0]!.length)) {
+      throw new VoiceProviderError('ElevenLabs sent a malformed timing for the voice', null, false);
     }
     const words = alignmentToWords(
       alignment.characters,

@@ -2,7 +2,7 @@
   "name": "Store products",
   "kind": "product",
   "material": { "select": "all" },
-  "perDay": 3,
+  "perDay": 1,
   "hour": 9,
   "language": "pt-BR",
   "objective": "sell the product: take people to the link in the bio",

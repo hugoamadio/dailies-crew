@@ -12,6 +12,7 @@ import {
   listRules,
   listVideos,
   rejectVideo,
+  requeueBudgetVideos,
   resumeStudio,
   retryVideo,
   runLineTick,
@@ -195,6 +196,8 @@ const COMMANDS: Record<string, CommandSpec> = {
     run: async (runtime, { ids }, io) => {
       const line = await setLineActive(runtime.db, ids[0]!, true);
       io.out(`Line on: "${line.name}" (every day at ${line.hour}h)`);
+      const queued = await requeueBudgetVideos(runtime.ctx, line.id);
+      if (queued > 0) io.out(`${queued} videos that waited for the cap were queued again.`);
       await sync(runtime, io);
     },
   },
@@ -339,7 +342,9 @@ const COMMANDS: Record<string, CommandSpec> = {
       const posts = video.social as SocialPosts | null;
       if (posts) {
         for (const network of SOCIAL_NETWORKS) {
-          io.out(`${network}: ${posts[network].title} ${posts[network].hashtags.join(' ')}`);
+          const post = posts[network];
+          io.out(`${network}: ${post.title} ${post.hashtags.join(' ')}`);
+          io.out(`  ${post.description}`);
         }
       }
     },
@@ -484,14 +489,19 @@ export async function runCli(
     return 1;
   }
   let runtime: Runtime | undefined;
+  let code = 1;
   try {
     runtime = await open({ queue: command.queue ?? false });
     await command.run(runtime, { ids, options, env }, io);
-    return 0;
+    code = 0;
   } catch (error) {
     io.err(error instanceof Error ? error.message : String(error));
-    return 1;
-  } finally {
-    await runtime?.close();
   }
+  try {
+    await runtime?.close();
+  } catch (error) {
+    io.err(`Could not close cleanly: ${error instanceof Error ? error.message : String(error)}`);
+    code = 1;
+  }
+  return code;
 }

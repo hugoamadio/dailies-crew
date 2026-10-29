@@ -3,8 +3,7 @@ import type { SettingsValues } from './schema';
 /**
  * Defaults from the spec (section 5). Prices in USD per million tokens, as published on
  * 2026-10-12; check https://platform.claude.com/docs/en/about-claude/pricing before real use.
- * Cache writes cost 1.25 × input (5-minute cache). Haiku 5.5 doubles from 100K prompt tokens on,
- * which the crews never reach.
+ * Cache writes cost 1.25 × input (5-minute cache).
  */
 export const DEFAULT_SETTINGS: SettingsValues = {
   roles: {
