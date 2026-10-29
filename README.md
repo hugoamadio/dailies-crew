@@ -84,6 +84,9 @@ npm run db:deploy        # creates the tables
 npm run worker           # keep it running: it makes the videos
 ```
 
+**After a reboot**: the database container restarts by itself; if it does not (`docker ps` shows
+no `postgres`), run `npm run db:up`, then `npm run worker` again.
+
 Then, in another terminal:
 
 ```bash
@@ -98,11 +101,15 @@ npm run crew -- reject <videoId> --reason "the price comes too late" --mode redo
 
 `npm run crew -- --help` lists every command. Videos, frames and assets live in `data/`.
 
+With the fake AI every line also uses the silent fake voice, so nothing is paid; set
+`DAILIES_REAL_VOICE=1` to let lines use their real voice provider (ElevenLabs, which costs money)
+even then.
+
 **With the real AI**, set `DAILIES_FAKE_AI=0` and `ANTHROPIC_API_KEY` in `.env`; lines whose voice
 provider is `elevenlabs` also need `ELEVENLABS_API_KEY` and a real `voiceId`. Every Claude call and
 every voice synthesis is recorded with its cost (`npm run crew -- costs`). Each line has a monthly
 cap and the settings have a global one: reaching a cap stops the line from starting new stages (caps
-are checked before each stage, so a stage already running can go a little over). The prices used for the
+are checked before each stage, so the stages already running, up to the concurrency, can go a little over). The prices used for the
 costs are in the settings (`npm run crew -- settings`); check them against the current Claude and
 ElevenLabs prices. If the key is refused or the credit runs out, every line stops and
 `npm run crew -- status` says why: fix it, then run `npm run crew -- resume`.

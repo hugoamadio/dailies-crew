@@ -1,6 +1,6 @@
 import { createDb, type Db } from '@dailies-crew/db';
 import { produceVideo } from '@dailies-crew/engine';
-import { createVoiceProvider } from '@dailies-crew/engine/voice';
+import { createVoiceProvider, type VoiceProvider } from '@dailies-crew/engine/voice';
 import {
   BossQueue,
   createStudioLlm,
@@ -53,6 +53,23 @@ const noQueue: JobQueue = {
   },
 };
 
+/**
+ * The voice a line uses. With the fake AI (DAILIES_FAKE_AI=1) every line gets the silent fake
+ * voice, so nothing is paid, unless DAILIES_REAL_VOICE=1 asks for the line's real provider.
+ */
+export function voiceFor(
+  provider: 'elevenlabs' | 'fake',
+  env: Record<string, string | undefined>,
+): VoiceProvider {
+  const free = env.DAILIES_FAKE_AI === '1' && env.DAILIES_REAL_VOICE !== '1';
+  try {
+    return createVoiceProvider(free ? 'fake' : provider, env);
+  } catch (error) {
+    // a missing ElevenLabs key will not appear by retrying
+    throw new StudioError(error instanceof Error ? error.message : String(error));
+  }
+}
+
 /** Database, AI, voices, queue and data folder, wired from the environment */
 export async function createRuntime(
   env: Record<string, string | undefined>,
@@ -85,14 +102,7 @@ export async function createRuntime(
   const ctx: StudioContext = {
     db,
     llm,
-    voices: (provider) => {
-      try {
-        return createVoiceProvider(provider, env);
-      } catch (error) {
-        // a missing ElevenLabs key will not appear by retrying
-        throw new StudioError(error instanceof Error ? error.message : String(error));
-      }
-    },
+    voices: (provider) => voiceFor(provider, env),
     queue: boss ? new BossQueue(boss) : noQueue,
     dataDir,
     now: () => new Date(),
