@@ -118,7 +118,7 @@ ElevenLabs prices. If the key is refused or the credit runs out, every line stop
 
 The panel is a web app for one person on this machine: it answers only on `127.0.0.1`, has no
 login, and refuses any request whose host is not `127.0.0.1` or `localhost`. In English and
-Portuguese. Next.js telemetry is turned off in every script.
+Portuguese. Next.js telemetry is turned off in every web script.
 
 ```bash
 npm run worker           # in one terminal: the panel never makes videos itself
@@ -126,8 +126,9 @@ npm run web              # in another: http://127.0.0.1:3300
 ```
 
 The worker is a separate process: the panel only queues jobs, so without the worker nothing gets
-made (the sidebar says so). The `.env` keys behave as in the studio: with `DAILIES_FAKE_AI=1`
-everything is free and offline.
+made (the sidebar says so). With `DAILIES_FAKE_AI=1` the crews' AI calls are fake and cost nothing.
+Two things still go online: the voice, when `DAILIES_REAL_VOICE=1` is set (paid), and the "Check
+keys" button, which calls each provider's free endpoint.
 
 - **Today**: what is in production, ready for review, waiting for you or failed (with "Try
   again"), this month's spending against the caps, and the next daily runs.
