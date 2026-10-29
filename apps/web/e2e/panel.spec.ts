@@ -161,3 +161,19 @@ test('a request for the right host name on another port is refused', async ({ re
   });
   expect(response.status()).toBe(403);
 });
+
+test('no page can be framed by another site, and files are never embeddable cross-origin', async ({
+  request,
+  baseURL,
+}) => {
+  const page = await request.get(`${baseURL}/`);
+  expect(page.headers()['x-frame-options']).toBe('DENY');
+  expect(page.headers()['content-security-policy']).toContain("frame-ancestors 'none'");
+  const file = await request.get(`${baseURL}/files/jobs/${seeded().toApprove}/video.mp4`);
+  expect(file.status()).toBe(200);
+  expect(file.headers()['x-frame-options']).toBe('DENY');
+  // the files route keeps its own, stricter policy (the proxy must not replace it)
+  expect(file.headers()['content-security-policy']).toContain("frame-ancestors 'none'");
+  expect(file.headers()['content-security-policy']).toContain('sandbox');
+  expect(file.headers()['cross-origin-resource-policy']).toBe('same-origin');
+});

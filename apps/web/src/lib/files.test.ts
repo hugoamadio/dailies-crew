@@ -85,11 +85,19 @@ describe('parseRange', () => {
 });
 
 describe('downloadName', () => {
-  it('keeps safe characters only', () => {
-    expect(downloadName('Luminária Lua 2026-10-12.mp4', 'video.mp4')).toBe(
+  it('keeps safe characters only, and the real extension', () => {
+    expect(downloadName('Luminária Lua 2026-10-12.mp4', 'video.mp4', '.mp4')).toBe(
       'Lumin-ria-Lua-2026-10-12.mp4',
     );
-    expect(downloadName('../../x', 'video.mp4')).toBe('x');
-    expect(downloadName(null, 'video.mp4')).toBe('video.mp4');
+    expect(downloadName('../../x', 'video.mp4', '.mp4')).toBe('x.mp4');
+    expect(downloadName(null, 'video.mp4', '.mp4')).toBe('video.mp4');
+    expect(downloadName('', 'my video.mp4', '.mp4')).toBe('my-video.mp4');
+  });
+
+  it('never lets the requested name change the extension', () => {
+    expect(downloadName('x.html', 'logo.svg', '.svg')).toBe('x.svg');
+    expect(downloadName('x.svg.html', 'logo.svg', '.svg')).toBe('x.svg.svg');
+    expect(downloadName('page.HTML', 'a.png', '.png')).toBe('page.png');
+    expect(downloadName('x', 'logo.svg', '.svg')).toBe('x.svg');
   });
 });

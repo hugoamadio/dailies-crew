@@ -12,7 +12,10 @@ type Context = { params: Promise<{ path: string[] }> };
 /** No file served here ever runs as a page (an SVG with a script, say) */
 const SAFE_HEADERS = {
   'x-content-type-options': 'nosniff',
-  'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+  'content-security-policy':
+    "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; sandbox",
+  'x-frame-options': 'DENY',
+  'cross-origin-resource-policy': 'same-origin',
   'cache-control': 'no-store',
   'accept-ranges': 'bytes',
 };
@@ -24,7 +27,7 @@ async function serve(request: NextRequest, context: Context, withBody: boolean) 
   const headers: Record<string, string> = { ...SAFE_HEADERS, 'content-type': found.type };
   const download = request.nextUrl.searchParams.get('download');
   if (download !== null) {
-    const name = downloadName(download, path.basename(found.file));
+    const name = downloadName(download, path.basename(found.file), path.extname(found.file));
     headers['content-disposition'] = `attachment; filename="${name}"`;
   }
   const range = parseRange(request.headers.get('range'), found.size);

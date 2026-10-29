@@ -75,8 +75,20 @@ export function parseRange(
   return { start, end };
 }
 
-/** A name for Content-Disposition: the same safe characters as asset names, or a default */
-export function downloadName(wanted: string | null, fallback: string): string {
-  const clean = (wanted ?? '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[.-]+/, '');
-  return clean.slice(0, 120) || fallback;
+function cleanName(name: string): string {
+  return name.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[.-]+/, '');
+}
+
+/**
+ * A name for Content-Disposition: the same safe characters as asset names, or the fallback
+ * (cleaned too). The extension is always the real file's (`extension`, with its dot), whatever the
+ * requested name says, so "?download=x.html" on an SVG cannot save a page.
+ */
+export function downloadName(wanted: string | null, fallback: string, extension: string): string {
+  const strip = (name: string) => {
+    const real = name.toLowerCase().endsWith(extension.toLowerCase());
+    return real ? name.slice(0, -extension.length) : name.replace(/\.[A-Za-z0-9]+$/, '');
+  };
+  const stem = strip(cleanName(wanted ?? '')).slice(0, 120);
+  return `${stem || strip(cleanName(fallback)) || 'file'}${extension}`;
 }
