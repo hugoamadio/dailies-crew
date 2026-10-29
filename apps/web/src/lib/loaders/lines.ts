@@ -12,6 +12,7 @@ import {
   listRules,
   studioStatus,
 } from '@dailies-crew/studio';
+import { categoriesOf } from './categories';
 
 export type LineState = 'on' | 'pausedByYou' | 'pausedCap' | 'stopped';
 
@@ -77,7 +78,7 @@ export async function loadLineForm(db: Db, dataDir: string, id?: string) {
       name: product.name,
       active: product.active,
     })),
-    categories: [...new Set(products.flatMap((product) => product.category ?? []))].sort(),
+    categories: categoriesOf(products),
     music,
     fonts: [...FONT_NAMES],
     line,
