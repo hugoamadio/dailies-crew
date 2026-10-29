@@ -88,7 +88,8 @@ test('a new product is saved with its photos', async ({ page }) => {
 
 test('settings are saved', async ({ page }) => {
   await page.goto('/settings');
-  await expect(page.getByText('Configured').or(page.getByText('Missing')).first()).toBeVisible();
+  // the config gives the panel fake keys, so both show as configured (never the real ones)
+  await expect(page.getByText('Configured').first()).toBeVisible();
   await page.getByLabel('Global monthly cap (USD)').fill('77');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Settings saved')).toBeVisible();
@@ -152,4 +153,11 @@ test('settings: a new model with prices is saved and the new-model row is emptie
   await expect(page.getByLabel('Add a model', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Add a model: Input')).toHaveValue('');
   await expect(page.getByLabel('claude-e2e-model: Input')).toHaveValue(/^3(\.0+)?$/);
+});
+
+test('a request for the right host name on another port is refused', async ({ request }) => {
+  const response = await request.get('http://127.0.0.1:3310/', {
+    headers: { host: '127.0.0.1:3399' },
+  });
+  expect(response.status()).toBe(403);
 });

@@ -14,6 +14,8 @@ if (!process.env.DATABASE_URL) {
 const baseURL = `http://127.0.0.1:${E2E_PORT}`;
 
 /**
+ * NEVER run this together with "npm run test:integration": both empty and seed dailies_test.
+ *
  * Browser smoke tests of the panel ("npm run test:web"): a production build on port 3310 against
  * dailies_test with seeded data and the fake AI, driven by Playwright's own headless Chromium.
  */
@@ -29,7 +31,7 @@ export default defineConfig({
   use: { baseURL, trace: 'retain-on-failure', locale: 'en-US' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `npx next build && npx next start -H 127.0.0.1 -p ${E2E_PORT}`,
+    command: `npx tsx e2e/prepare-db.ts && npx next build && npx next start -H 127.0.0.1 -p ${E2E_PORT}`,
     cwd: import.meta.dirname,
     url: baseURL,
     reuseExistingServer: false,
@@ -42,6 +44,9 @@ export default defineConfig({
       DAILIES_FAKE_AI: '1',
       DAILIES_WEB_DIST_DIR: E2E_DIST_DIR,
       NEXT_TELEMETRY_DISABLED: '1',
+      // never Hugo's real keys (the .env above is loaded into this process)
+      ANTHROPIC_API_KEY: 'test-anthropic-key-not-real',
+      ELEVENLABS_API_KEY: 'test-elevenlabs-key-not-real',
     },
   },
 });
