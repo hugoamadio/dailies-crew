@@ -19,8 +19,16 @@ function withDatabase(url: string, database: string): string {
   return parsed.toString();
 }
 
-/** Creates the dailies_test database next to the dev one and applies every migration to it */
-export default async function setup(project: TestProject): Promise<void> {
+/** dailies_test next to the database of the root .env: the one place that URL is computed */
+export function testDatabaseUrl(databaseUrl: string): string {
+  return withDatabase(databaseUrl, TEST_DATABASE);
+}
+
+/**
+ * Creates the dailies_test database next to the dev one (DATABASE_URL of the root .env) and
+ * applies every migration to it; returns its URL. The panel's Playwright tests call it too.
+ */
+export async function prepareTestDatabase(): Promise<string> {
   try {
     process.loadEnvFile(path.join(repoRoot, '.env'));
   } catch {
@@ -40,7 +48,7 @@ export default async function setup(project: TestProject): Promise<void> {
   } finally {
     await admin.end();
   }
-  const testUrl = withDatabase(url, TEST_DATABASE);
+  const testUrl = testDatabaseUrl(url);
   try {
     execFileSync(
       'npx',
@@ -51,5 +59,10 @@ export default async function setup(project: TestProject): Promise<void> {
     const output = (error as { stderr?: Buffer }).stderr?.toString() ?? String(error);
     throw new Error(`prisma migrate deploy failed on ${TEST_DATABASE}:\n${output}`);
   }
-  project.provide('testDatabaseUrl', testUrl);
+  return testUrl;
+}
+
+/** Vitest's global setup for the integration tests */
+export default async function setup(project: TestProject): Promise<void> {
+  project.provide('testDatabaseUrl', await prepareTestDatabase());
 }

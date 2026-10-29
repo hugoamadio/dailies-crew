@@ -30,7 +30,8 @@
     "crew": "tsx apps/worker/src/crew.ts",
     "web": "NEXT_TELEMETRY_DISABLED=1 next dev apps/web -H 127.0.0.1 -p 3300",
     "web:build": "NEXT_TELEMETRY_DISABLED=1 next build apps/web",
-    "web:start": "NEXT_TELEMETRY_DISABLED=1 next start apps/web -H 127.0.0.1 -p 3300"
+    "web:start": "NEXT_TELEMETRY_DISABLED=1 next start apps/web -H 127.0.0.1 -p 3300",
+    "test:web": "NEXT_TELEMETRY_DISABLED=1 playwright test -c apps/web/playwright.config.ts"
   },
   "devDependencies": {
     "@remotion/cli": "4.0.534",
