@@ -1,3 +1,4 @@
+import 'server-only';
 import { resumeStudio, retryVideo } from '@dailies-crew/studio';
 import type { Dictionary } from '../../i18n/dictionary';
 import { fill } from '../../i18n/locale';

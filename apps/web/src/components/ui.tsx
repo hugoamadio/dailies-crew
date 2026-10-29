@@ -23,7 +23,7 @@ export const fileInputClass =
   'block w-full text-sm text-muted file:mr-3 file:h-9 file:cursor-pointer file:rounded-lg file:border file:border-line file:bg-panel file:px-3 file:text-sm file:font-medium file:text-ink hover:file:bg-sunken';
 
 export const inputClass =
-  'block w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none';
+  'block w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40';
 
 export function PageHeader(props: { title: string; description?: string; actions?: ReactNode }) {
   return (
@@ -100,7 +100,7 @@ export function Meter(props: { value: number; max: number; label: string }) {
         aria-label={props.label}
         aria-valuemin={0}
         aria-valuemax={props.max}
-        aria-valuenow={props.value}
+        aria-valuenow={Math.min(props.value, props.max)}
       >
         <div
           className={cx('h-full rounded-full', tone)}

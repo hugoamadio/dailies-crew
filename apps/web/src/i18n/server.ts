@@ -1,3 +1,4 @@
+import 'server-only';
 import { cookies, headers } from 'next/headers';
 import { type Dictionary, dictionaryFor } from './dictionary';
 import { LOCALE_COOKIE, type Locale, pickLocale } from './locale';

@@ -38,6 +38,8 @@ export const ptBR: Dictionary = {
     stoppedTitle: 'Tudo está parado',
     stoppedBody:
       'Desde {since}: {warning}. Corrija a chave ou coloque crédito e retome: os vídeos que esperavam voltam para a fila.',
+    stoppedBodyNoTime:
+      '{warning}. Corrija a chave ou coloque crédito e retome: os vídeos que esperavam voltam para a fila.',
     resume: 'Retomar',
     resuming: 'Retomando…',
     resumed: 'Retomado: {lines} linhas ligadas, {videos} vídeos de volta na fila.',

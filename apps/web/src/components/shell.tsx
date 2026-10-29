@@ -142,9 +142,9 @@ export async function Shell(props: { locale: Locale; t: Dictionary; children: Re
             <TriangleAlert size={18} aria-hidden />
             <p className="flex-1">
               <strong>{t.shell.stoppedTitle}.</strong>{' '}
-              {fill(t.shell.stoppedBody, {
+              {fill(settings.warningAt ? t.shell.stoppedBody : t.shell.stoppedBodyNoTime, {
                 since: settings.warningAt ? format.dateTime(settings.warningAt) : '',
-                warning: settings.warning,
+                warning: settings.warning.replace(/[.\s]+$/, ''),
               })}
             </p>
             <ActionButton

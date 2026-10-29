@@ -1,3 +1,4 @@
+import 'server-only';
 import fs from 'node:fs';
 import path from 'node:path';
 import { StudioError } from '@dailies-crew/studio';
@@ -25,8 +26,9 @@ export function findRepoRoot(start: string): string {
 export function loadRootEnv(root: string): void {
   try {
     process.loadEnvFile(path.join(root, '.env'));
-  } catch {
-    // no .env file: the environment alone is used
+  } catch (error) {
+    // no .env file: the environment alone is used; any other problem is real
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 }
 

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { cx } from './ui';
 
 const ICONS = {
@@ -46,6 +46,18 @@ function activeHref(entries: NavEntry[], pathname: string): string | null {
   );
   return matches.sort((a, b) => b.length - a.length)[0] ?? null;
 }
+
+/** A stored choice is trusted only if it is a plain object of booleans; otherwise the defaults */
+function onlyBooleans(value: unknown): Record<string, boolean> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const out: Record<string, boolean> = {};
+  for (const [key, each] of Object.entries(value)) {
+    if (typeof each === 'boolean') out[key] = each;
+  }
+  return out;
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function Item(props: { link: NavLink; active: boolean; icon?: NavIcon; nested?: boolean }) {
   const Icon = props.icon ? ICONS[props.icon] : null;
@@ -90,12 +102,51 @@ export function Sidebar(props: {
 
   useEffect(() => {
     try {
-      setOpen(JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, boolean>);
+      setOpen(onlyBooleans(JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}')));
     } catch {
       // storage blocked or broken: every group stays open
     }
   }, []);
   useEffect(() => setDrawer(false), [pathname]);
+
+  const drawerId = useId();
+  const drawerRef = useRef<HTMLElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!drawer) return;
+    const opener = menuButton.current;
+    const panel = drawerRef.current;
+    const scrollBefore = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    panel?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDrawer(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !panel) return;
+      const items = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      if (!panel.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = scrollBefore;
+      opener?.focus();
+    };
+  }, [drawer]);
 
   const toggle = (id: string) => {
     const next = { ...open, [id]: !(open[id] ?? true) };
@@ -173,9 +224,11 @@ export function Sidebar(props: {
         <button
           type="button"
           className="rounded-lg p-1.5 text-muted hover:bg-sunken"
+          ref={menuButton}
           onClick={() => setDrawer(true)}
           aria-label={props.menuLabel}
           aria-expanded={drawer}
+          aria-controls={drawerId}
         >
           <Menu size={20} aria-hidden />
         </button>
@@ -192,7 +245,14 @@ export function Sidebar(props: {
             aria-label={props.closeLabel}
             onClick={() => setDrawer(false)}
           />
-          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-panel shadow-xl">
+          <aside
+            ref={drawerRef}
+            id={drawerId}
+            role="dialog"
+            aria-modal="true"
+            aria-label={props.title}
+            className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-panel shadow-xl"
+          >
             {nav}
           </aside>
         </div>

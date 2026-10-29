@@ -1,3 +1,4 @@
+import 'server-only';
 import { revalidatePath } from 'next/cache';
 import type { Dictionary } from '../../i18n/dictionary';
 import { getI18n } from '../../i18n/server';

@@ -37,6 +37,8 @@ export const en = {
     stoppedTitle: 'Everything is stopped',
     stoppedBody:
       'Since {since}: {warning}. Fix the key or add credit, then resume: the waiting videos go back to the queue.',
+    stoppedBodyNoTime:
+      '{warning}. Fix the key or add credit, then resume: the waiting videos go back to the queue.',
     resume: 'Resume',
     resuming: 'Resuming…',
     resumed: 'Resumed: {lines} lines on, {videos} videos queued again.',
