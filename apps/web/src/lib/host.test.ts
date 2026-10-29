@@ -18,6 +18,9 @@ describe('isAllowedHost', () => {
     expect(isAllowedHost(null, '3300')).toBe(false);
     expect(isAllowedHost('', undefined)).toBe(false);
     expect(isAllowedHost('user@127.0.0.1:3300', '3300')).toBe(false);
+    expect(isAllowedHost('localhost:3300@evil', '3300')).toBe(false);
+    expect(isAllowedHost('[::1]:3300', '3300')).toBe(false);
+    expect(isAllowedHost('127.0.0.1.evil.com:3300', '3300')).toBe(false);
   });
 
   it('takes any port of this machine when the port is not known', () => {
