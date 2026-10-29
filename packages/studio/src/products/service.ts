@@ -85,7 +85,9 @@ export async function updateProduct(
     imageFiles.length > 0
       ? await importImages(ctx.dataDir, id, imageFiles, nextImageNumber(current.images))
       : current.images;
-  return ctx.db.product.update({ where: { id }, data: { ...data, images } });
+  // "active" is validated above but never written: a switch flipped meanwhile must stay flipped
+  const { active: _active, ...fields } = data;
+  return ctx.db.product.update({ where: { id }, data: { ...fields, images } });
 }
 
 export async function getProduct(db: Db, id: string): Promise<Product> {

@@ -70,6 +70,13 @@ describe('updateProduct', () => {
     );
   });
 
+  it('does not undo the active switch', async () => {
+    const product = await createProduct({ db, dataDir }, productInput(), [LAMP_SVG]);
+    await setProductActive(db, product.id, false);
+    const updated = await updateProduct({ db, dataDir }, product.id, { name: 'Outra' });
+    expect(updated.active).toBe(false);
+  });
+
   it('replaces the photos with new ones numbered after the old, leaving the old files', async () => {
     const product = await createProduct({ db, dataDir }, productInput(), [LAMP_SVG, LAMP_SVG]);
     const updated = await updateProduct({ db, dataDir }, product.id, {}, [LAMP_SVG]);
