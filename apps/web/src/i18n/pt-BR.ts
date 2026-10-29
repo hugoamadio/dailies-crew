@@ -321,6 +321,7 @@ export const ptBR: Dictionary = {
     missing: 'Faltando',
     fakeAi:
       'A IA de mentira está ligada (DAILIES_FAKE_AI=1): nada é pago, e toda linha usa a voz de mentira, a não ser com DAILIES_REAL_VOICE=1.',
+    realVoice: 'As vozes de verdade estão ligadas: a ElevenLabs é paga mesmo com a IA de mentira.',
     checkKeys: 'Testar chaves',
     checking: 'Testando…',
     keyResults: {

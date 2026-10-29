@@ -314,6 +314,7 @@ export const en = {
     missing: 'Missing',
     fakeAi:
       'The fake AI is on (DAILIES_FAKE_AI=1): nothing is paid, and every line uses the fake voice unless DAILIES_REAL_VOICE=1.',
+    realVoice: 'Real voices are on: ElevenLabs is paid even with the fake AI.',
     checkKeys: 'Check keys',
     checking: 'Checking…',
     keyResults: { ok: 'works', refused: 'refused', missing: 'missing', error: 'could not check' },
