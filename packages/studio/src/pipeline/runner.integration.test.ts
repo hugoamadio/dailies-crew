@@ -240,6 +240,25 @@ describe('runStage', () => {
     ]);
   });
 
+  it('records the voice as the provider actually used: the fake voice costs nothing', async () => {
+    const ctx = testContext(db, dataDir);
+    const video = await topicVideo(
+      { stage: 'produce', status: 'queued' },
+      {
+        voice: { provider: 'elevenlabs', voiceId: 'v' },
+      },
+    );
+    const speak: StageHandler = async (_ctx, run) => {
+      await run.voice().synthesize({ text: 'Olá', voiceId: 'v', language: 'pt-BR' });
+      return { outcome: { kind: 'next' }, output: {} };
+    };
+    await runStage(ctx, 'produce', job(video.id), handlers({ produce: speak }));
+    expect(await db.costEntry.findFirstOrThrow({ where: { role: 'voice' } })).toMatchObject({
+      model: 'fake',
+      usd: 0,
+    });
+  });
+
   it('starts a new round on a rework, and forgets the voice when it starts at produce', async () => {
     const ctx = testContext(db, dataDir);
     const video = await topicVideo({ stage: 'review', status: 'running' });

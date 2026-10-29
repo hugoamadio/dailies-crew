@@ -142,7 +142,11 @@ export async function setLineActive(db: Db, id: string, active: boolean): Promis
 
 /** The system stops a line (spending cap, API key) and says why */
 export async function pauseLine(db: Db, id: string, reason: string): Promise<void> {
-  await db.productionLine.update({ where: { id }, data: { active: false, pausedReason: reason } });
+  // only a line that is on: Hugo's own pause must not gain a reason (it would come back by itself)
+  await db.productionLine.updateMany({
+    where: { id, active: true },
+    data: { active: false, pausedReason: reason },
+  });
 }
 
 /** The line's learned rules, oldest first (the active ones go into every prompt) */

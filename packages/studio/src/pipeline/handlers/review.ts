@@ -11,6 +11,7 @@ import {
   sampleEvenly,
 } from '../../crew/reviewer';
 import { buildSocialRequest, type SocialPosts } from '../../crew/social';
+import { LlmError } from '../../llm/errors';
 import type { StageHandler } from '../handler';
 import { chosenIdeaOf, latestOutput, scriptOf } from '../inputs';
 import { json } from '../json';
@@ -73,6 +74,9 @@ export const review: StageHandler = async (ctx, run) => {
         ),
       );
     } catch (error) {
+      // a refused key or no credit must still stop everything
+      if (error instanceof LlmError && (error.kind === 'auth' || error.kind === 'credit'))
+        throw error;
       ctx.log(
         `[review] ${run.video.id}: no post texts for the video handed to Hugo: ${error instanceof Error ? error.message : String(error)}`,
       );

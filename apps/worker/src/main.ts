@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const { scheduled } = await syncSchedules(boss, runtime.db);
   const ai = runtime.ctx.llm.name === 'fake' ? 'the fake AI (DAILIES_FAKE_AI=1)' : 'Claude';
   console.log(
-    `Dailies Crew worker ready with ${ai}: ${scheduled.length} active lines scheduled, data in ${runtime.ctx.dataDir}`,
+    `Dailies Crew worker ready with ${ai}: ${scheduled.length} lines scheduled (active, or paused by the budget), data in ${runtime.ctx.dataDir}`,
   );
   let stopping = false;
   const stop = async (signal: string) => {

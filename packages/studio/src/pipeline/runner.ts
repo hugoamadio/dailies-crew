@@ -206,16 +206,20 @@ export async function runStage(
         await record(result.model, result.usage);
         return result.data;
       },
-      voice: () =>
-        meteredVoice(ctx.voices(line.voice.provider), async (characters) => {
+      voice: () => {
+        const provider = ctx.voices(line.voice.provider);
+        // priced as the provider actually used (the fake AI mode swaps in the free fake voice)
+        const priced = provider.name === 'elevenlabs' ? 'elevenlabs' : 'fake';
+        return meteredVoice(provider, async (characters) => {
           const usd = await recordVoiceCost(ctx.db, settings, {
             lineId: line.id,
             videoId: video.id,
-            provider: line.voice.provider,
+            provider: priced,
             characters,
           });
           cost += usd;
-        }),
+        });
+      },
     };
     const result = await handlers[stage](ctx, runContext);
     outcome = result.outcome;

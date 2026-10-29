@@ -181,7 +181,9 @@ describe('the crew CLI', () => {
     } as unknown as NonNullable<Runtime['boss']>;
     const file = await writeJson('settings.json', { timezone: 'America/New_York' });
     const saved = await crew(['settings:set', '--file', file], {}, boss);
-    expect(saved.out).toBe('Settings saved.\nSchedules updated: 1 active lines.');
+    expect(saved.out).toBe(
+      'Settings saved.\nSchedules updated: 1 lines (active, or paused by the budget).',
+    );
     expect(schedules).toEqual([{ cron: '0 9 * * *', tz: 'America/New_York' }]);
   });
 

@@ -8,6 +8,7 @@ import {
   getLine,
   listLines,
   listRules,
+  pauseLine,
   setLineActive,
   setRuleActive,
   updateLine,
@@ -24,6 +25,24 @@ afterEach(async () => {
 });
 afterAll(async () => {
   await db.$disconnect();
+});
+
+describe('pauseLine', () => {
+  it('leaves a line Hugo paused without a reason and off', async () => {
+    const line = await createLine({ db, dataDir }, topicLineInput());
+    await setLineActive(db, line.id, false);
+    await pauseLine(db, line.id, 'reached its monthly cap');
+    expect(await db.productionLine.findUniqueOrThrow({ where: { id: line.id } })).toMatchObject({
+      active: false,
+      pausedReason: null,
+    });
+    await setLineActive(db, line.id, true);
+    await pauseLine(db, line.id, 'reached its monthly cap');
+    expect(await db.productionLine.findUniqueOrThrow({ where: { id: line.id } })).toMatchObject({
+      active: false,
+      pausedReason: 'reached its monthly cap',
+    });
+  });
 });
 
 describe('line service', () => {

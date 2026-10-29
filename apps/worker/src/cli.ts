@@ -113,7 +113,7 @@ async function readJson(file: string): Promise<unknown> {
 async function sync(runtime: Runtime, io: CliIo): Promise<void> {
   if (!runtime.boss) return;
   const { scheduled } = await syncSchedules(runtime.boss, runtime.db);
-  io.out(`Schedules updated: ${scheduled.length} active lines.`);
+  io.out(`Schedules updated: ${scheduled.length} lines (active, or paused by the budget).`);
 }
 
 /** Like sync, for a command whose change is already saved: a failed sync must not look like a failed save */

@@ -14,18 +14,20 @@ export interface TickResult {
 }
 
 /** Turns the line back on and queues its budget-paused videos again (guarded: no double jobs) */
-async function liftBudgetPause(ctx: StudioContext, line: Line): Promise<void> {
+async function liftBudgetPause(ctx: StudioContext, line: Line): Promise<boolean> {
   const videos = await ctx.db.$transaction(async (tx) => {
     const lifted = await tx.productionLine.updateMany({
       where: { id: line.id, active: false, pausedReason: { not: null } },
       data: { active: true, pausedReason: null, warning: null },
     });
-    if (lifted.count === 0) return 0;
+    if (lifted.count === 0) return null;
     return requeueWaiting(ctx, tx, { lineId: line.id, status: 'paused_budget' });
   });
+  if (videos === null) return false;
   ctx.log(
     `[tick] line "${line.name}" is back on: its budget passes again; ${videos} videos queued`,
   );
+  return true;
 }
 
 /**
@@ -56,7 +58,9 @@ export async function runLineTick(
         ? (await checkBudget(ctx.db, settings, line, now)).ok
         : false;
     if (!lifted) return { created: [], skipped: `line "${line.name}" is paused` };
-    await liftBudgetPause(ctx, line);
+    // someone else changed the line meanwhile: this tick makes nothing
+    if (!(await liftBudgetPause(ctx, line)))
+      return { created: [], skipped: `line "${line.name}" is paused` };
   }
   if (settings.warning) return { created: [], skipped: settings.warning };
   const budget = await checkBudget(ctx.db, settings, line, now);

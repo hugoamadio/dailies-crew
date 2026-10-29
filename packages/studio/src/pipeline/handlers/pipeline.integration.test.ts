@@ -112,6 +112,22 @@ describe('the stages together', () => {
     expect(handed.videoFile).not.toBeNull();
   });
 
+  it('stops everything when the post texts for the video handed to Hugo get a refused key', async () => {
+    const round = [adjust, approve, approve];
+    const llm = createFakeLlm()
+      .script('reviewer', ...round, ...round, ...round)
+      .script('social', new LlmError('auth', 'key refused', false));
+    const ctx = testContext(db, dataDir, { llm });
+    const video = await productVideo();
+    await ctx.queue.enqueue('prepare', video.id);
+    await drain(ctx, STAGE_HANDLERS);
+
+    expect((await db.video.findUniqueOrThrow({ where: { id: video.id } })).status).toBe('failed');
+    expect((await db.settings.findUniqueOrThrow({ where: { id: 1 } })).warning).toContain(
+      'key refused',
+    );
+  });
+
   it('still hand the video to Hugo when its post texts cannot be written', async () => {
     const round = [adjust, approve, approve];
     const llm = createFakeLlm()
