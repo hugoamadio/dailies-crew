@@ -77,6 +77,7 @@ describe('anthropicProbe (faked HTTP, no network)', () => {
     const result = await down(KEY);
     expect(result.state).toBe('error');
     expect(result.detail).not.toContain(KEY);
+    expect(result.detail).toContain('***');
   });
 });
 

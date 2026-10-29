@@ -14,5 +14,11 @@ export async function saveSettingsAction(
 }
 
 export async function checkKeysAction(): Promise<Record<KeyName, KeyCheck>> {
-  return checkKeys((await getPanel()).env);
+  try {
+    return await checkKeys((await getPanel()).env);
+  } catch {
+    // the page shows "could not check" instead of the error boundary
+    const failed: KeyCheck = { state: 'error' };
+    return { anthropic: failed, elevenlabs: failed };
+  }
 }

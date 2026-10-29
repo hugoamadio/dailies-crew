@@ -34,15 +34,15 @@ function detailOf(error: unknown, key: string): string {
  */
 export function anthropicProbe(fetchImpl?: typeof fetch): Probe {
   return async (key) => {
-    const client = new Anthropic({
-      apiKey: key,
-      authToken: null,
-      baseURL: 'https://api.anthropic.com',
-      maxRetries: 0,
-      timeout: 15_000,
-      ...(fetchImpl ? { fetch: fetchImpl } : {}),
-    });
     try {
+      const client = new Anthropic({
+        apiKey: key,
+        authToken: null,
+        baseURL: 'https://api.anthropic.com',
+        maxRetries: 0,
+        timeout: 15_000,
+        ...(fetchImpl ? { fetch: fetchImpl } : {}),
+      });
       await client.models.list({ limit: 1 });
       return { state: 'ok' };
     } catch (error) {

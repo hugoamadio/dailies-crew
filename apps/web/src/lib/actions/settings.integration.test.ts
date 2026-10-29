@@ -67,6 +67,14 @@ describe('settings', () => {
     expect(settings.prices.models['claude-opus-5-5']?.output).toBe(25);
   });
 
+  it('keeps a stored zone the browser list does not know', async () => {
+    const panel = testPanel(db, dataDir);
+    await saveSettings(panel, await settingsForm({ timezone: 'UTC' }), t);
+    expect((await getSettings(db)).timezone).toBe('UTC');
+    await saveSettings(panel, await settingsForm({ timezone: 'Asia/Kolkata' }), t);
+    expect((await getSettings(db)).timezone).toBe('Asia/Kolkata');
+  });
+
   it('saves nothing and names the field when a value is wrong', async () => {
     const panel = testPanel(db, dataDir);
     const error = await saveSettings(

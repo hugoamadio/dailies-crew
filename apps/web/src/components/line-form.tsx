@@ -8,6 +8,7 @@ import { fieldError, type FormAction, IDLE } from '../lib/actions/state';
 import { COLORS } from '../lib/forms/line';
 import { FormStatus } from './form-status';
 import { filesTooBig } from './upload-limit';
+import { useSaves } from './use-saves';
 import { buttonClass, Card, Field, fileInputClass, inputClass } from './ui';
 
 const PERSONALITIES = ['calm', 'energetic', 'playful', 'premium'] as const;
@@ -41,6 +42,7 @@ export function LineForm(props: {
   const { t, line } = props;
   const l = t.lines;
   const [state, submit, pending] = useActionState(props.action, IDLE);
+  const saves = useSaves(state);
   const [tooBig, setTooBig] = useState(false);
   const [kind, setKind] = useState<string>(line?.kind ?? 'product');
   const productMaterial = line?.kind === 'product' ? line.material : null;
@@ -354,6 +356,7 @@ export function LineForm(props: {
                 />
               ) : null}
               <input
+                key={saves}
                 {...input('logoFile', {
                   type: 'file',
                   accept: '.png,.jpg,.jpeg,.webp,.svg',

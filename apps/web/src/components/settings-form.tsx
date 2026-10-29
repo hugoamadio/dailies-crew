@@ -1,11 +1,13 @@
 'use client';
 
-import { startTransition, useActionState } from 'react';
+import { startTransition, useActionState, useRef } from 'react';
 import type { Dictionary } from '../i18n/dictionary';
 import { fieldError, type FormAction, IDLE } from '../lib/actions/state';
+import { timezoneOptions } from '../lib/forms/timezones';
 import { PRICE_KEYS } from '../lib/forms/settings-prices';
 import type { LoadedSettings } from '../lib/loaders/settings';
 import { FormStatus } from './form-status';
+import { useSaves } from './use-saves';
 import { buttonClass, Card, Field, inputClass } from './ui';
 
 const numberInput = `${inputClass} tabular-nums`;
@@ -15,7 +17,11 @@ export function SettingsForm(props: { action: FormAction; t: Dictionary; data: L
   const s = t.settings;
   const { values } = data;
   const [state, submit, pending] = useActionState(props.action, IDLE);
+  const saves = useSaves(state);
+  // errors of a new model arrive under the name that was typed: show them under its own inputs
+  const addedName = useRef('');
   const error = (name: string) => fieldError(state, name);
+  const addedError = (key: string) => error(`prices.models.${addedName.current}.${key}`);
   const models = Object.keys(values.prices.models).sort();
   return (
     <form
@@ -25,6 +31,7 @@ export function SettingsForm(props: { action: FormAction; t: Dictionary; data: L
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
+        addedName.current = String(data.get('newModel.name') ?? '').trim();
         startTransition(() => submit(data));
       }}
     >
@@ -48,7 +55,7 @@ export function SettingsForm(props: { action: FormAction; t: Dictionary; data: L
               defaultValue={values.timezone}
               className={inputClass}
             >
-              {data.timezones.map((zone) => (
+              {timezoneOptions(data.timezones, values.timezone).map((zone) => (
                 <option key={zone}>{zone}</option>
               ))}
             </select>
@@ -157,7 +164,7 @@ export function SettingsForm(props: { action: FormAction; t: Dictionary; data: L
                   })}
                 </tr>
               ))}
-              <tr>
+              <tr key={saves}>
                 <td className="py-2 pr-3">
                   <input
                     name="newModel.name"
@@ -175,6 +182,9 @@ export function SettingsForm(props: { action: FormAction; t: Dictionary; data: L
                       inputMode="decimal"
                       className={numberInput}
                     />
+                    {addedError(key) ? (
+                      <p className="mt-1 text-xs text-bad">{addedError(key)}</p>
+                    ) : null}
                   </td>
                 ))}
               </tr>

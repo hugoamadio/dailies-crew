@@ -6,6 +6,7 @@ import type { Dictionary } from '../i18n/dictionary';
 import { fieldError, type FormAction, IDLE } from '../lib/actions/state';
 import { FormStatus } from './form-status';
 import { filesTooBig } from './upload-limit';
+import { useSaves } from './use-saves';
 import { buttonClass, Card, Field, fileInputClass, inputClass } from './ui';
 
 /** Cents as the person types money: 8990 → "89.90" */
@@ -23,6 +24,7 @@ export function ProductForm(props: {
   const { t, product } = props;
   const p = t.products;
   const [state, submit, pending] = useActionState(props.action, IDLE);
+  const saves = useSaves(state);
   const [tooBig, setTooBig] = useState(false);
   const error = (name: string) => fieldError(state, name);
   const input = (name: string, extra: Record<string, unknown> = {}) => ({
@@ -141,6 +143,7 @@ export function ProductForm(props: {
               </div>
             ) : null}
             <input
+              key={saves}
               {...input('photos', {
                 type: 'file',
                 multiple: true,
