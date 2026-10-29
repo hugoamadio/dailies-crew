@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, SettingsPatchSchema } from '@dailies-crew/studio';
+import { DEFAULT_SETTINGS, SettingsPatchSchema, StudioError } from '@dailies-crew/studio';
 import { describe, expect, it } from 'vitest';
 import { settingsFromForm } from './settings';
 
@@ -37,5 +37,21 @@ describe('settingsFromForm', () => {
       'claude-fable-5-1': { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
     });
     expect(patch).toMatchObject({ defaultHour: 8, globalMonthlyCapUsd: 75 });
+  });
+
+  it('refuses a new model named like a listed one instead of replacing its prices', () => {
+    const entries: [string, string][] = [
+      ['prices.models.claude-x.input', '1'],
+      ['newModel.name', 'claude-x'],
+      ['newModel.input', '9'],
+    ];
+    let thrown: unknown;
+    try {
+      settingsFromForm(form(entries));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(StudioError);
+    expect((thrown as StudioError).issues.map((issue) => issue.path)).toEqual(['newModel.name']);
   });
 });

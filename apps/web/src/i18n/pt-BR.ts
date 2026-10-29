@@ -43,6 +43,7 @@ export const ptBR: Dictionary = {
     resume: 'Retomar',
     resuming: 'Retomando…',
     resumed: 'Retomado: {lines} linhas ligadas, {videos} vídeos de volta na fila.',
+    startFailedTitle: 'O painel não conseguiu iniciar',
     dbDownTitle: 'O painel não alcança o banco de dados',
     dbDownBody: 'Suba o banco com {command} e recarregue esta página.',
   },
@@ -359,6 +360,7 @@ export const ptBR: Dictionary = {
     cacheWrite: 'Escrita de cache',
     newModel: 'Adicionar um modelo',
     newModelName: 'Id do modelo',
+    modelExists: 'Já existe um modelo com este id na lista: altere os preços dele lá.',
     voicePrices: 'Voz (USD por 1000 caracteres)',
     saved: 'Configurações salvas; os horários diários seguem elas.',
     savedNoSync:

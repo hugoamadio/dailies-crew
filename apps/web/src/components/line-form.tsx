@@ -1,5 +1,6 @@
 'use client';
 
+import { musicOptions } from '../lib/forms/music';
 import type { Line } from '@dailies-crew/studio';
 import { startTransition, useActionState, useState } from 'react';
 import type { Dictionary } from '../i18n/dictionary';
@@ -387,7 +388,7 @@ export function LineForm(props: {
           <Field label={l.music} name="musicTrack" hint={l.musicHint} error={error('musicTrack')}>
             <select {...input('musicTrack', { defaultValue: line?.musicTrack ?? '' })}>
               <option value="">{l.noMusic}</option>
-              {props.music.map((track) => (
+              {musicOptions(props.music, line?.musicTrack).map((track) => (
                 <option key={track} value={track}>
                   {track.replace(/^music\//, '')}
                 </option>

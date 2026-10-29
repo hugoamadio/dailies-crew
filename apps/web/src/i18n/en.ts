@@ -42,6 +42,7 @@ export const en = {
     resume: 'Resume',
     resuming: 'Resuming…',
     resumed: 'Resumed: {lines} lines on, {videos} videos queued again.',
+    startFailedTitle: 'The panel could not start',
     dbDownTitle: 'The panel cannot reach the database',
     dbDownBody: 'Start it with {command}, then reload this page.',
   },
@@ -347,6 +348,7 @@ export const en = {
     cacheWrite: 'Cache write',
     newModel: 'Add a model',
     newModelName: 'Model id',
+    modelExists: 'A model with this id is already listed: change its prices there.',
     voicePrices: 'Voice (USD per 1000 characters)',
     saved: 'Settings saved; the daily schedules follow them.',
     savedNoSync:

@@ -13,6 +13,6 @@ export async function saveSettings(
   form: FormData,
   t: Dictionary,
 ): Promise<ActionState> {
-  await updateSettings(panel.ctx.db, settingsFromForm(form));
+  await updateSettings(panel.ctx.db, settingsFromForm(form, t.settings.modelExists));
   return done((await syncQuietly(panel)) ? t.settings.saved : t.settings.savedNoSync);
 }
